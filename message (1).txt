@@ -30,7 +30,7 @@ local tbl =
 	helpers = Instance.new("ModuleScript"),
 	toys = Instance.new("ModuleScript"),
 	convert = Instance.new("ModuleScript"),
-	pushrooms = Instance.new("ModuleScript"),
+	puffshrooms = Instance.new("ModuleScript"),
 	pushroomTools = Instance.new("ModuleScript"),
 	rarities = Instance.new("ModuleScript"),
 	mobs = Instance.new("ModuleScript")
@@ -96,14 +96,14 @@ tbl.toys.Parent = tbl.Features
 tbl.convert.Name = "convert"
 tbl.convert.Parent = tbl.Features
 
-tbl.pushrooms.Name = "pushrooms"
-tbl.pushrooms.Parent = tbl.Features
+tbl.puffshrooms.Name = "puffshrooms"
+tbl.puffshrooms.Parent = tbl.Features
 
 tbl.pushroomTools.Name = "pushroomTools"
-tbl.pushroomTools.Parent = tbl.pushrooms
+tbl.pushroomTools.Parent = tbl.puffshrooms
 
 tbl.rarities.Name = "rarities"
-tbl.rarities.Parent = tbl.pushrooms
+tbl.rarities.Parent = tbl.puffshrooms
 
 tbl.mobs.Name = "mobs"
 tbl.mobs.Parent = tbl.Features
@@ -4558,7 +4558,7 @@ modules[tbl.autofarmTab] = function()
 	local components = script.Parent.Parent.components
 	
 	local Autofarm = require(Features.autofarm)
-	local puffshroom = require(Features.pushrooms)
+	local puffshroom = require(Features.puffshrooms)
 	local convert = require(Features.convert)
 	
 	local taskSystem = require(components.taskSystem)
@@ -4580,7 +4580,7 @@ modules[tbl.autofarmTab] = function()
 		local tab = window:AddTab("Autofarm")
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		local autofarmSettingsBox = tab:AddLeftGroupbox('Settings')
-		local pushroomBox = tab:AddRightGroupbox('Pushrooms')
+		local pushroomBox = tab:AddRightGroupbox('puffshrooms')
 	
 		mainGroupBox:AddToggle('Autofarm', {
 			Text = 'Autofarm',
@@ -4598,7 +4598,7 @@ modules[tbl.autofarmTab] = function()
 		})
 		
 		mainGroupBox:AddButton({
-			Text = 'destroy ui',
+			Text = 'gake',
 			Func = function()
 				uiLibrary:Unload()
 				taskSystem.taskSystemDestroy()
@@ -4641,7 +4641,7 @@ modules[tbl.autofarmTab] = function()
 		})
 		pushroomBox:AddDropdown('MaterialsForPuffs', {
 			Values = materials,
-			Tooltip = "Materials to use for pushrooms.",
+			Tooltip = "Materials to use for puffshrooms.",
 			Default = 1, 
 			Text = 'Materials',
 			AllowNull = true,
@@ -5139,8 +5139,8 @@ modules[tbl.convert] = function()
 	return convert
 end
 
-modules[tbl.pushrooms] = function()
-	local script = tbl.pushrooms
+modules[tbl.puffshrooms] = function()
+	local script = tbl.puffshrooms
 
 	local pushroom = {}
 	
@@ -5214,7 +5214,7 @@ modules[tbl.pushrooms] = function()
 		puffTask:addToQueue()
 	end
 	
-	local function pushroomsEnding()
+	local function puffshroomsEnding()
 		autofarm.togglePuffshrooms(false)
 	end
 	
@@ -5230,7 +5230,7 @@ modules[tbl.pushrooms] = function()
 	end
 	
 	function pushroom.init()
-		puffTask = taskManager.new("pushroom", 8, startPuffs, pushroomsEnding)
+		puffTask = taskManager.new("pushroom", 8, startPuffs, puffshroomsEnding)
 		
 		PushroomFolder.ChildAdded:Connect(pushroomAdded)
 	end
