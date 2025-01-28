@@ -2,7 +2,7 @@
 	
 	Gui2Lua Winning! ~ Ch0nky Code:tm:
 	
-	21 instances
+	24 instances
 	
 	-> shared.gv2.require("main").printChangelogs()
 	
@@ -20,6 +20,8 @@ local tbl =
 	tween = Instance.new("ModuleScript"),
 	signal = Instance.new("ModuleScript"),
 	keyPress = Instance.new("ModuleScript"),
+	monsterData = Instance.new("ModuleScript"),
+	getTokens = Instance.new("ModuleScript"),
 	tabs = Instance.new("Folder"),
 	autofarmTab = Instance.new("ModuleScript"),
 	toysTab = Instance.new("ModuleScript"),
@@ -30,7 +32,8 @@ local tbl =
 	convert = Instance.new("ModuleScript"),
 	pushrooms = Instance.new("ModuleScript"),
 	pushroomTools = Instance.new("ModuleScript"),
-	rarities = Instance.new("ModuleScript")
+	rarities = Instance.new("ModuleScript"),
+	mobs = Instance.new("ModuleScript")
 }
 
 tbl.bee_swarm_simulator.Name = "bee_swarm_simulator"
@@ -62,6 +65,12 @@ tbl.signal.Parent = tbl.components
 
 tbl.keyPress.Name = "keyPress"
 tbl.keyPress.Parent = tbl.components
+
+tbl.monsterData.Name = "monsterData"
+tbl.monsterData.Parent = tbl.components
+
+tbl.getTokens.Name = "getTokens"
+tbl.getTokens.Parent = tbl.components
 
 tbl.tabs.Name = "tabs"
 tbl.tabs.Parent = tbl.bee_swarm_simulator
@@ -96,6 +105,9 @@ tbl.pushroomTools.Parent = tbl.pushrooms
 tbl.rarities.Name = "rarities"
 tbl.rarities.Parent = tbl.pushrooms
 
+tbl.mobs.Name = "mobs"
+tbl.mobs.Parent = tbl.Features
+
 local modules, cache = {}, {}
 		
 local o_require = require;
@@ -123,6 +135,8 @@ modules[tbl.taskSystem] = function()
 	local playerMovement = require(script.Parent.playerMovement)
 	local tween = require(script.Parent.tween)
 	
+	local dead = false --so umur stfu and i can make stop nigger  needs to suicid elike duck on accident pls
+	
 	local function getBestTask()
 		local bestLevel = 0
 		local bestTask
@@ -136,6 +150,9 @@ modules[tbl.taskSystem] = function()
 	end
 	
 	local function startTask(self)
+		if dead then 
+			return
+		end
 		local oldTask = runningTask
 		runningTask = self --prob can remove this cus idk why theres 2 lmao
 	
@@ -233,6 +250,14 @@ modules[tbl.taskSystem] = function()
 		self.endCallback = endCallback
 	
 		return self
+	end
+	
+	function taskSystem.taskSystemDestroy()
+		dead = true
+		table.clear(queue)
+		if runningTask then
+			runningTask:stop(true,true)
+		end
 	end
 	
 	return taskSystem
@@ -4292,6 +4317,7 @@ modules[tbl.playerMovement] = function()
 	local script = tbl.playerMovement
 
 	local playerMovement = {}
+	playerMovement.movementFinished = require(script.Parent.signal).new()
 	
 	local connection
 	local destination
@@ -4311,6 +4337,8 @@ modules[tbl.playerMovement] = function()
 			connection = humanoid.MoveToFinished:Connect(function(r)
 				if not r then
 					humanoid:MoveTo(destination)
+				else
+					playerMovement.movementFinished:fire()
 				end
 			end)	
 		end
@@ -4360,7 +4388,7 @@ modules[tbl.tween] = function()
 				primaryPart.Velocity = Vector3.new()
 				primaryPart.RotVelocity = Vector3.new()
 				
-				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*225/distance))
+				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*100/distance))
 			end
 		end)
 	end
@@ -4476,13 +4504,65 @@ modules[tbl.keyPress] = function()
 	return module
 end
 
+modules[tbl.monsterData] = function()
+	local script = tbl.monsterData
+
+	
+	local monstersData = {Spawners = {}, MonsterTypes = {}}
+	local monsterSpawners = monstersData.Spawners
+	for i,v in (workspace.MonsterSpawners:GetChildren()) do
+		monsterSpawners[v] = {}
+		monsterSpawners[v].monsterType = v.MonsterType.Value
+		monsterSpawners[v].spawner = v
+		if v.Name == "WerewolfCave" then
+			monsterSpawners[v].territory = v.Territory.Value.w
+		elseif v.Name == "MushroomBush" then
+			monsterSpawners[v].territory = v.Territory.Value.Part
+		else
+			monsterSpawners[v].territory = v.Territory.Value
+		end
+	
+		if not table.find(monstersData.MonsterTypes, v.MonsterType.Value) then
+			table.insert(monstersData.MonsterTypes, v.MonsterType.Value)
+		end
+	end
+	return monstersData
+end
+
+modules[tbl.getTokens] = function()
+	local script = tbl.getTokens
+
+	return function(pos, Maxdistance)
+		if not pos then
+			return {}
+		end
+		local tokenTable={}
+	
+		for index, token in (workspace.Collectibles:GetChildren()) do
+			local distance = (pos-token.Position).Magnitude
+	
+			if distance <= Maxdistance then
+				table.insert(tokenTable, token)
+			end
+		end
+		return tokenTable
+	end
+end
+
 modules[tbl.autofarmTab] = function()
 	local script = tbl.autofarmTab
 
 	local autofarmTab = {}
 	
 	local Features = script.Parent.Parent.Features
+	local components = script.Parent.Parent.components
+	
 	local Autofarm = require(Features.autofarm)
+	local puffshroom = require(Features.pushrooms)
+	local convert = require(Features.convert)
+	
+	local taskSystem = require(components.taskSystem)
+	local uiLibrary = require(components.linoria)
 	
 	local fields = {}
 	
@@ -4511,6 +4591,23 @@ modules[tbl.autofarmTab] = function()
 			Text = 'Auto Dig',
 			Callback = Autofarm.autodig
 		})
+		
+		mainGroupBox:AddToggle('ConvertToggle', {
+			Text = 'Convert Backpack',
+			Callback = convert.toggleConvert
+		})
+		
+		mainGroupBox:AddButton({
+			Text = 'destroy ui',
+			Func = function()
+				uiLibrary:Unload()
+				taskSystem.taskSystemDestroy()
+			end,
+			DoubleClick = false,
+			Tooltip = 'gake'
+		})
+	
+		
 		
 		autofarmSettingsBox:AddDropdown('Field', {
 			Values = fields,
@@ -4548,7 +4645,7 @@ modules[tbl.autofarmTab] = function()
 			Default = 1, 
 			Text = 'Materials',
 			AllowNull = true,
-			Callback = Autofarm.changeField
+			Callback = puffshroom.changeMaterials
 		})
 	end
 	
@@ -4562,19 +4659,39 @@ modules[tbl.toysTab] = function()
 	
 	local Features = script.Parent.Parent.Features
 	local Toys = require(Features.toys)
+	local Mobs = require(Features.mobs)
+	local mobData = require(script.Parent.Parent.components.monsterData).MonsterTypes
 	
 	local fieldBoosters = {"Red Field Booster", "Blue Field Booster", "Field Booster"}
 	
 	function autofarmTab.init(window)	
-		local tab = window:AddTab("Toys")
+		local tab = window:AddTab("Toys/Kill")
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		local autofarmSettingsBox = tab:AddLeftGroupbox('Settings')
-		
+		local killgroupbox = tab:AddRightGroupbox('Auto Kill')
+	
 		mainGroupBox:AddDropdown('Toys', {
 			Values = fieldBoosters,
 			Multi = true,
 			AllowNull = true,
 			Text = 'Toys',
+			Callback = Toys.changeToyEnabled
+		})
+		
+	
+		killgroupbox:AddDropdown('Monsters', {
+			Values = mobData,
+			Multi = true,
+			AllowNull = true,
+			Text = 'Monsters',
+			Callback = Mobs.changeMobsEnabled
+		})
+		killgroupbox:AddDropdown('BabyLoveMonsters', {
+			Values = mobData,
+			Multi = true,
+			AllowNull = true,
+			Text = 'Baby Love',
+			Tooltip = "Mobs to wait for baby love before killing.",
 			Callback = Toys.changeToyEnabled
 		})
 	end
@@ -4661,9 +4778,12 @@ modules[tbl.autofarm] = function()
 		local id = 	autofarmSettings.preciseQueue[preciseIndex]	
 		local preciseData = activeCrosshairs[id]
 		
-		if not preciseData or preciseData.Touched or lastPreciseTarget and preciseData.FE ~= lastPreciseTarget.FE then
+		if not preciseData or preciseData.Disk.Activated or preciseData.Touched or lastPreciseTarget and preciseData.FE ~= lastPreciseTarget.FE then
 			return
 		end
+		table.remove(autofarmSettings.preciseQueue, preciseIndex)
+		preciseIndex -= 2
+		
 		lastPreciseTarget = preciseData
 		targetToken = preciseData.Disk.Part
 		playerMovement.newDestination(targetToken.Position)
@@ -4679,15 +4799,15 @@ modules[tbl.autofarm] = function()
 		if #tokens == 0 then
 			return 
 		end
-		tokenIndex += 1
+		--tokenIndex += 1
 	
-		if not tokens[tokenIndex] then
-			tokenIndex = 1
-		end
+		--if not tokens[tokenIndex] then
+		--	tokenIndex = 1
+		--end
 		
-		local target = tokens[tokenIndex]
+		local target = tokens[1]
 		
-		table.remove(tokens, tokenIndex)
+		table.remove(tokens, 1)
 	
 		if not autofarmHelpers.canGetItem(target, autofarmSettings.field, autofarmSettings.tokenDistance, autofarmSettings.puffs) then
 			return nextToken() -- this causes the freeze sometimes
@@ -4974,8 +5094,12 @@ modules[tbl.convert] = function()
 	local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
 	
 	local convertTask
+	local convertToggled
 	
 	local function checkConvert()
+		if not convertToggled then
+			return
+		end
 		if Pollen.Value >= Capacity.Value then
 			convertTask:addToQueue()
 		elseif convertTask.running and Pollen.Value == 0 then
@@ -4995,6 +5119,14 @@ modules[tbl.convert] = function()
 				keyPress.pressE()
 			end
 		end
+	end
+	
+	function convert.toggleConvert(value)
+		convertToggled = value
+		if not value and convertTask.running then
+			return convertTask:stop(true, true)
+		end
+		checkConvert()
 	end
 	
 	function convert.init()
@@ -5028,7 +5160,7 @@ modules[tbl.pushrooms] = function()
 	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	local puffTask
-	local doPuffs = false
+	local puffsEnabled = false
 	local attempts = 0
 	
 	local puffType = {
@@ -5076,7 +5208,7 @@ modules[tbl.pushrooms] = function()
 	end
 	
 	local function pushroomAdded()
-		if not doPuffs then
+		if not puffsEnabled then
 			return
 		end
 		puffTask:addToQueue()
@@ -5091,6 +5223,10 @@ modules[tbl.pushrooms] = function()
 		attempts = 0
 		autofarm.togglePuffshrooms(true)
 		doPuffs()
+	end
+	
+	function pushroom.changeMaterials()
+		
 	end
 	
 	function pushroom.init()
@@ -5184,6 +5320,111 @@ modules[tbl.rarities] = function()
 		["Legendary"] = 4,
 		["Mythic"] = 5
 	}
+end
+
+modules[tbl.mobs] = function()
+	local script = tbl.mobs
+
+	local mob = {}
+	
+	local replicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local components = script.Parent.Parent.components
+	
+	local tweenModule = require(components.tween)
+	local taskSystem = require(components.taskSystem)
+	local keyPress = require(components.keyPress)
+	local mobData = require(components.monsterData).Spawners
+	local tokens = require(components.getTokens)
+	local playerMovement = require(components.playerMovement)
+	
+	local mobTools = require(replicatedStorage.ClientMonsterTools)
+	
+	local mobSettings = {
+		mobsEnabled = {}
+	}
+	
+	local mobTask 
+	local mobsToKill = {}
+	
+	local mobTask 
+	
+	local function killMob(monsterData)
+		local isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
+		local cframe = monsterData.territory.CFrame
+	
+		tweenModule.tween(cframe)
+		tweenModule.tweenComplete:wait()
+	
+		while not isOnCooldown  do
+			local character = shared.character
+			local humanoid : Humanoid = character and character:FindFirstChild("Humanoid")
+			
+			if humanoid then
+				humanoid.Jump = true
+			end
+			
+			isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
+			task.wait(1)
+		end
+		task.wait(1)
+		local pos = shared.character and shared.character.PrimaryPart
+		local tokens = tokens(pos.Position, 60)
+		
+		for _, token in tokens do
+			print('1')
+			playerMovement.newDestination(token.Position)
+			playerMovement.movementFinished:wait()
+			print('2')
+		end
+	end
+	
+	local function startGettingMobs()
+		for _, mob in mobsToKill do
+			table.remove(mobsToKill, table.find(mobsToKill, mob))
+			killMob(mob)
+			task.wait(.5)
+		end
+		mobTask:stop(true)
+	end 
+	
+	local function loop()
+		while task.wait(1) do
+			set_thread_identity(2)
+	
+			for spawner, monsterData in mobData do
+				local enabled = Options.Monsters.Value[monsterData.monsterType]
+				if not enabled then
+					continue
+				end
+	
+				local isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
+				if not table.find(mobsToKill, monsterData) and not isOnCooldown and not mobTask.running then
+					table.insert(mobsToKill, monsterData)
+					mobTask:addToQueue()
+				end
+			end
+			set_thread_identity(8)
+		end
+	end
+	
+	function mob.toggled(value)
+		if not value then
+			mobTask:stop(true)
+		end
+	end
+	
+	function mob.changeMobsEnabled()
+		mobSettings.mobsEnabled = Options.Monsters.Value
+	end
+	
+	function mob.init()
+		mobTask = taskSystem.new("mobs", 4, startGettingMobs)
+		
+		task.spawn(loop)
+	end
+	
+	return mob
 end
 
 task.spawn(function()
