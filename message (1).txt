@@ -31,8 +31,8 @@ local tbl =
 	precisePathfind = Instance.new("ModuleScript"),
 	toys = Instance.new("ModuleScript"),
 	convert = Instance.new("ModuleScript"),
-	puffshrooms = Instance.new("ModuleScript"),
-	puffshroomTools = Instance.new("ModuleScript"),
+	pushrooms = Instance.new("ModuleScript"),
+	pushroomTools = Instance.new("ModuleScript"),
 	rarities = Instance.new("ModuleScript"),
 	mobs = Instance.new("ModuleScript")
 }
@@ -100,14 +100,14 @@ tbl.toys.Parent = tbl.Features
 tbl.convert.Name = "convert"
 tbl.convert.Parent = tbl.Features
 
-tbl.puffshrooms.Name = "puffshrooms"
-tbl.puffshrooms.Parent = tbl.Features
+tbl.pushrooms.Name = "pushrooms"
+tbl.pushrooms.Parent = tbl.Features
 
-tbl.puffshroomTools.Name = "puffshroomTools"
-tbl.puffshroomTools.Parent = tbl.puffshrooms
+tbl.pushroomTools.Name = "pushroomTools"
+tbl.pushroomTools.Parent = tbl.pushrooms
 
 tbl.rarities.Name = "rarities"
-tbl.rarities.Parent = tbl.puffshrooms
+tbl.rarities.Parent = tbl.pushrooms
 
 tbl.mobs.Name = "mobs"
 tbl.mobs.Parent = tbl.Features
@@ -4580,7 +4580,7 @@ modules[tbl.autofarmTab] = function()
 	local components = script.Parent.Parent.components
 	
 	local Autofarm = require(Features.autofarm)
-	local puffshroom = require(Features.puffshrooms)
+	local puffshroom = require(Features.pushrooms)
 	local convert = require(Features.convert)
 	
 	local taskSystem = require(components.taskSystem)
@@ -4602,7 +4602,7 @@ modules[tbl.autofarmTab] = function()
 		local tab = window:AddTab("Autofarm")
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		local autofarmSettingsBox = tab:AddLeftGroupbox('Settings')
-		local puffshroomBox = tab:AddRightGroupbox('puffshrooms')
+		local pushroomBox = tab:AddRightGroupbox('Pushrooms')
 	
 		mainGroupBox:AddToggle('Autofarm', {
 			Text = 'Autofarm',
@@ -4655,21 +4655,21 @@ modules[tbl.autofarmTab] = function()
 			Callback = Autofarm.setPreciseEnabled
 		})
 		
-		--puffshroom side
+		--pushroom side
 		
-		puffshroomBox:AddToggle('PuffAutofarm', {
+		pushroomBox:AddToggle('PuffAutofarm', {
 			Text = 'Autofarm',
 			Callback = Autofarm.toggled
 		})
-		puffshroomBox:AddToggle('glitterForPuffs', {
+		pushroomBox:AddToggle('glitterForPuffs', {
 			Text = 'Glitter high rarity puffs',
 			Callback = Autofarm.toggled,
-			Tooltip = 'Uses glitter in a field if a legendary or mythic puffshroom is detected',
+			Tooltip = 'Uses glitter in a field if a legendary or mythic pushroom is detected',
 		})
-		puffshroomBox:AddDropdown('MaterialsForPuffs', {
+		pushroomBox:AddDropdown('MaterialsForPuffs', {
 			Values = materials,
-			Tooltip = "Materials to use for puffshrooms.",
-			Default = 0, 
+			Tooltip = "Materials to use for pushrooms.",
+			Default = 1, 
 			Text = 'Materials',
 			AllowNull = true,
 			Callback = puffshroom.changeMaterials
@@ -5442,10 +5442,10 @@ modules[tbl.convert] = function()
 	return convert
 end
 
-modules[tbl.puffshrooms] = function()
-	local script = tbl.puffshrooms
+modules[tbl.pushrooms] = function()
+	local script = tbl.pushrooms
 
-	local puffshroom = {}
+	local pushroom = {}
 	
 	local player = shared.localPlayer
 	
@@ -5455,12 +5455,12 @@ modules[tbl.puffshrooms] = function()
 	local tweenModule = require(components.tween)
 	local keyPress = require(components.keyPress)
 	
-	local puffTools = require(script.puffshroomTools)
+	local puffTools = require(script.pushroomTools)
 	local autofarm = require(script.Parent.autofarm)
 	local rarities = require(script.rarities)
 	
 	local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
-	local puffshroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
+	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	local puffTask
 	local puffsEnabled = false
@@ -5510,14 +5510,14 @@ modules[tbl.puffshrooms] = function()
 		doPuffs()
 	end
 	
-	local function puffshroomAdded()
+	local function pushroomAdded()
 		if not puffsEnabled then
 			return
 		end
 		puffTask:addToQueue()
 	end
 	
-	local function puffshroomsEnding()
+	local function pushroomsEnding()
 		autofarm.togglePuffshrooms(false)
 	end
 	
@@ -5528,27 +5528,27 @@ modules[tbl.puffshrooms] = function()
 		doPuffs()
 	end
 	
-	function puffshroom.changeMaterials()
+	function pushroom.changeMaterials()
 		
 	end
 	
-	function puffshroom.init()
-		puffTask = taskManager.new("puffshroom", 8, startPuffs, puffshroomsEnding)
+	function pushroom.init()
+		puffTask = taskManager.new("pushroom", 8, startPuffs, pushroomsEnding)
 		
-		puffshroomFolder.ChildAdded:Connect(puffshroomAdded)
+		PushroomFolder.ChildAdded:Connect(pushroomAdded)
 	end
 	
-	return puffshroom
+	return pushroom
 end
 
-modules[tbl.puffshroomTools] = function()
-	local script = tbl.puffshroomTools
+modules[tbl.pushroomTools] = function()
+	local script = tbl.pushroomTools
 
 	local module = {}
 	
 	local RarityTable = require(script.Parent.rarities)
 	
-	local puffshroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
+	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	function module.getRarity(puff)
 		return string.split(tostring(puff), "Model")[2]
@@ -5572,7 +5572,7 @@ modules[tbl.puffshroomTools] = function()
 		local BestRarity = nil
 		local BestLevel = nil
 	
-		for index, puff in (puffshroomFolder:GetChildren()) do
+		for index, puff in (PushroomFolder:GetChildren()) do
 			local Rarity = module.getRarity(puff)
 			local Level = module.getLevel(puff)
 			if not Rarity or not Level  then
