@@ -4602,7 +4602,7 @@ modules[tbl.autofarmTab] = function()
 		local tab = window:AddTab("Autofarm")
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		local autofarmSettingsBox = tab:AddLeftGroupbox('Settings')
-		local puffshroomBox = tab:AddRightGroupbox('puffshrooms')
+		local puffshroomBox = tab:AddRightGroupbox('Puffshrooms')
 	
 		mainGroupBox:AddToggle('Autofarm', {
 			Text = 'Autofarm',
