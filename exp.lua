@@ -5066,7 +5066,7 @@ modules[tbl.autofarm] = function()
 		autofarm.startAutofarm = startAutofarm
 	end
 	
-	function module.changeTarget(v)
+	function autofarm.changeTarget(v)
 		targetToken = v
 	end
 	
