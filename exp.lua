@@ -31,8 +31,8 @@ local tbl =
 	precisePathfind = Instance.new("ModuleScript"),
 	toys = Instance.new("ModuleScript"),
 	convert = Instance.new("ModuleScript"),
-	puffshrooms = Instance.new("ModuleScript"),
-	puffshroomTools = Instance.new("ModuleScript"),
+	pushrooms = Instance.new("ModuleScript"),
+	pushroomTools = Instance.new("ModuleScript"),
 	rarities = Instance.new("ModuleScript"),
 	mobs = Instance.new("ModuleScript")
 }
@@ -100,14 +100,14 @@ tbl.toys.Parent = tbl.Features
 tbl.convert.Name = "convert"
 tbl.convert.Parent = tbl.Features
 
-tbl.puffshrooms.Name = "puffshrooms"
-tbl.puffshrooms.Parent = tbl.Features
+tbl.pushrooms.Name = "pushrooms"
+tbl.pushrooms.Parent = tbl.Features
 
-tbl.puffshroomTools.Name = "puffshroomTools"
-tbl.puffshroomTools.Parent = tbl.puffshrooms
+tbl.pushroomTools.Name = "pushroomTools"
+tbl.pushroomTools.Parent = tbl.pushrooms
 
 tbl.rarities.Name = "rarities"
-tbl.rarities.Parent = tbl.puffshrooms
+tbl.rarities.Parent = tbl.pushrooms
 
 tbl.mobs.Name = "mobs"
 tbl.mobs.Parent = tbl.Features
@@ -4358,7 +4358,8 @@ modules[tbl.playerMovement] = function()
 			end)
 			local oldconnection = connection
 			task.delay(time, function()
-				if oldconnection == connection then
+				distance = (destination-character.PrimaryPart.Position).Magnitude
+				if oldconnection == connection and distance <= 4 then
 					playerMovement.movementFinished:fire()
 					connection:Disconnect()
 				end
@@ -4580,7 +4581,7 @@ modules[tbl.autofarmTab] = function()
 	local components = script.Parent.Parent.components
 	
 	local Autofarm = require(Features.autofarm)
-	local puffshroom = require(Features.puffshrooms)
+	local puffshroom = require(Features.pushrooms)
 	local convert = require(Features.convert)
 	
 	local taskSystem = require(components.taskSystem)
@@ -4602,7 +4603,7 @@ modules[tbl.autofarmTab] = function()
 		local tab = window:AddTab("Autofarm")
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		local autofarmSettingsBox = tab:AddLeftGroupbox('Settings')
-		local puffshroomBox = tab:AddRightGroupbox('Puffshrooms')
+		local pushroomBox = tab:AddRightGroupbox('Pushrooms')
 	
 		mainGroupBox:AddToggle('Autofarm', {
 			Text = 'Autofarm',
@@ -4620,7 +4621,7 @@ modules[tbl.autofarmTab] = function()
 		})
 		
 		mainGroupBox:AddButton({
-			Text = 'gake',
+			Text = 'destroy ui',
 			Func = function()
 				uiLibrary:Unload()
 				taskSystem.taskSystemDestroy()
@@ -4628,14 +4629,12 @@ modules[tbl.autofarmTab] = function()
 			DoubleClick = false,
 			Tooltip = 'gake'
 		})
-		
-		
 	
 		
 		
 		autofarmSettingsBox:AddDropdown('Field', {
 			Values = fields,
-			Default = 18, 
+			Default = 1, 
 			Text = 'Field',
 			Callback = Autofarm.changeField
 		})
@@ -4653,25 +4652,30 @@ modules[tbl.autofarmTab] = function()
 		})
 	
 		autofarmSettingsBox:AddToggle('farmInMarks', {
-			Text = 'Farm In Marks',
-			Callback = Autofarm.setPreciseEnabled
+			Text = 'Farm in Marks',
+			Callback = Autofarm.setMarksEnabled
 		})
 		
-		--puffshroom side
+		autofarmSettingsBox:AddToggle('farmInMarks', {
+			Text = 'Farm in Flames',
+			Callback = Autofarm.setMarksEnabled
+		})
 		
-		puffshroomBox:AddToggle('PuffAutofarm', {
+		--pushroom side
+		
+		pushroomBox:AddToggle('PuffAutofarm', {
 			Text = 'Autofarm',
 			Callback = Autofarm.toggled
 		})
-		puffshroomBox:AddToggle('glitterForPuffs', {
-			Text = 'Glitter legendary and mythic puffshrooms',
+		pushroomBox:AddToggle('glitterForPuffs', {
+			Text = 'Glitter high rarity puffs',
 			Callback = Autofarm.toggled,
-			Tooltip = 'Uses glitter in a field if a legendary or mythic puffshroom is detected',
+			Tooltip = 'Uses glitter in a field if a legendary or mythic pushroom is detected',
 		})
-		puffshroomBox:AddDropdown('MaterialsForPuffs', {
+		pushroomBox:AddDropdown('MaterialsForPuffs', {
 			Values = materials,
-			Tooltip = "Materials to use while farming puffshrooms",
-			Default = 0, 
+			Tooltip = "Materials to use for pushrooms.",
+			Default = 1, 
 			Text = 'Materials',
 			AllowNull = true,
 			Callback = puffshroom.changeMaterials
@@ -4778,7 +4782,8 @@ modules[tbl.autofarm] = function()
 		field = fields["Dandelion Field"],
 		autodig = false,
 		doPrecise = false,
-		collectBubbles = true,
+		flames = true,
+		collectBubbles = false,
 		tokenDistance = DEFAULT_TOKEN_DISTANCE,
 		task = {
 			collectingTokens = true,
@@ -4891,17 +4896,21 @@ modules[tbl.autofarm] = function()
 		if not preciseData or preciseData.Disk.Activated or preciseData.Touched or lastPreciseTarget and preciseData.FE ~= lastPreciseTarget.FE then
 			return if #autofarmSettings.preciseQueue > 0 then doPrecise(task.wait()) else nil
 		end
+		
+		
 		if shouldGetPreciseMark() then
 			if not preciseParams.ismark then
 				return doPrecise()
 			end
+			targetToken = preciseData.Disk.Part
+	
 			return preciseMarkGetter(preciseData.Disk.Part, autofarmSettings.allCrosshairs)
 		end
-		
-		preciseCount += 1
-	
 		lastPreciseTarget = preciseData
 		targetToken = preciseData.Disk.Part
+	
+		preciseCount += 1
+	
 		playerMovement.newDestination(targetToken.Position)
 		table.remove(autofarmSettings.allCrosshairs, preciseIndex)
 	
@@ -4921,12 +4930,26 @@ modules[tbl.autofarm] = function()
 		end
 	end
 	
+	local function farmFlame()
+		local flame = autofarmHelpers.getFlame(autofarmSettings.field, autofarmSettings.tokenDistance, autofarmSettings.puffs)
+		if not flame then 
+			return
+		end
+		if autofarmSettings.smartAutofarms.red then
+			return autofarmHelpers.darkHeat(flame, autofarmSettings.field)
+		end
+		playerMovement.newDestination(flame.F.Position)
+	end
+	
 	function nextToken()
+		if not autofarmTask.running and not autofarmSettings.puffs then
+			return
+		end
 		if #autofarmSettings.preciseQueue > 0 and autofarmSettings.doPrecise and debug.getupvalue(preciseCrosshairsModule.InitBeams, 1) then
 			return doPrecise()
 		end
-		if not autofarmTask.running and not autofarmSettings.puffs then
-			return
+		if autofarmSettings.flames then
+			farmFlame()
 		end
 		if #tokens == 0 then
 			return 
@@ -5022,6 +5045,10 @@ modules[tbl.autofarm] = function()
 		autofarmSettings.doPrecise = value
 	end
 	
+	function autofarm.setMarksEnabled(value)
+		autofarmHelpers.markToggle(value)
+	end
+	
 	function autofarm.init()
 		autofarmHelpers.init()
 		autofarmTask = taskSystem.new("Autofarm", 1, startAutofarm)
@@ -5039,6 +5066,10 @@ modules[tbl.autofarm] = function()
 		autofarm.startAutofarm = startAutofarm
 	end
 	
+	function module.changeTarget(v)
+		targetToken = v
+	end
+	
 	return autofarm
 end
 
@@ -5048,6 +5079,8 @@ modules[tbl.helpers] = function()
 	local module = {}
 	
 	local DIRECTION = Vector3.new(0, -10, 0)
+	
+	local RunService = game:GetService("RunService")
 	
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Include
@@ -5060,13 +5093,17 @@ modules[tbl.helpers] = function()
 	
 	local stationManager = require(game.ReplicatedStorage.ClientScripts.Listeners.StationsListener)
 	local scorchingStarManager = require(game.ReplicatedStorage.LocalFX.ScorchingStar)
+	local localFlames = require(game.ReplicatedStorage.LocalFX.LocalFlames)
+	
+	local playerMovement = require(script.Parent.Parent.Parent.components.playerMovement)
+	
+	local flameids = {}
 	
 	local markCount = 0
 	
 	local extras = {
 		bubbles = false,
-		flames = false,
-		marks = true
+		marks = false,
 	}
 	
 	local function markCheck(token)
@@ -5177,6 +5214,97 @@ modules[tbl.helpers] = function()
 		end
 	end
 	
+	function module.markToggle(toggle)
+		extras.marks = toggle
+	end
+	
+	function module.getFlame(field, maxDistance, puffs)
+		if #flameids == 0 then
+			return nil
+		end
+		local activeFlames = debug.getupvalue(localFlames.IncrementTicks, 4)
+		
+		for _, id in flameids do
+			local flameData = activeFlames[id]
+			table.remove(flameids, _)
+			
+			if not flameData or not flameData.M or not module.canGetItem(flameData.F, field, maxDistance, puffs) then
+				continue
+			end
+			return flameData
+		end
+	end
+	
+	local radius = 18
+	
+	local function getXAndZPositions(angle)
+		local x = math.cos(angle) * radius
+		local z = math.sin(angle) * radius
+		return x, z
+	end
+	local function createFlamesParts(flame, field)
+	
+		local fullCircle = 2 * math.pi
+		local add = 1
+		local p = (flame.CFrame * CFrame.new(x, 0, z)).p
+		local position = Vector3.new(p.X,p.Y,p.Z)
+		while true do
+			local cast = module.posToField(position)
+	
+			if cast and cast.Instance == field then return position end
+	
+			task.spawn(function ()
+				local angle = add * (fullCircle / add+1)
+				local x, z = getXAndZPositions(angle)
+				p = (flame.CFrame * CFrame.new(x, 0, z)).p
+	
+				position = Vector3.new(p.X,p.Y,p.Z)
+			end)
+			add+=1
+	
+			if add >= 10 or not flame or not flame.Parent then return if flame and flame.Parent then p else nil end
+	
+			task.wait()
+		end    
+	
+		return position
+	end
+	
+	function module.darkHeat(flameData, field)
+		if flameData.D then
+			return
+		end
+		local character = shared.character
+		local hrp = character.PrimaryPart
+		local v = flameData.F
+	
+		if not hrp:FindFirstChild("BodyGyro") then
+			local BodyGyro = Instance.new("BodyGyro", character.PrimaryPart)
+			BodyGyro.D = 0
+			BodyGyro.MaxTorque = Vector3.new(0, math.huge, 0)
+		end
+		local BodyGyro = hrp.BodyGyro
+		local heartbeat = RunService.Heartbeat:Connect(function ()
+			local forwardVector = (hrp.Position - v.Position).Unit
+			local rightVector = forwardVector:Cross(Vector3.new(0,1,0))
+			local upVector = rightVector:Cross(forwardVector)
+	
+			local cframe = CFrame.fromMatrix(hrp.Position, -rightVector, upVector)
+			BodyGyro.CFrame = cframe
+		end)
+		local p = createFlamesParts(v, field)
+		if not p or not v or not v.Parent then
+			heartbeat:Disconnect()
+			BodyGyro:Destroy()
+			return
+		end
+	
+		playerMovement.newDestination(p)
+		playerMovement.movementFinished:wait()
+		heartbeat:Disconnect()
+		BodyGyro:Destroy()
+		task.wait(.06)
+	end
 	
 	function module.init()
 		workspace.Collectibles.ChildAdded:Connect(tokenAdded)
@@ -5192,6 +5320,15 @@ modules[tbl.helpers] = function()
 			markCount -= 1
 			return oldDestroy(...)
 		end)
+		
+		local oldAddFlame = nil; oldAddFlame = hookfunction(localFlames.AddFlame, function(...)
+			local p = {...}
+			local id = p[3]
+			
+			table.insert(flameids, id)
+			
+			return oldAddFlame(...)
+		end)
 	end
 	
 	return module
@@ -5206,6 +5343,7 @@ modules[tbl.precisePathfind] = function()
 	local preciseCrosshairsModule = require(game.ReplicatedStorage.LocalFX.LocalTargetPracticeBeam)
 	
 	local function addCrosshairHitboxes(crosshairs)
+		print('making hitboxes')
 		for _, params in crosshairs do
 			local id = params.id
 			local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
@@ -5217,15 +5355,18 @@ modules[tbl.precisePathfind] = function()
 			if not preciseData then
 				continue
 			end
-			local child = preciseData.Disk.Part
+			local child : Part = preciseData.Disk.Part
 			if child:FindFirstChild("PathfindingModifierPart") then
 				continue
 			end
+			if child.Color == Color3.fromRGB(119, 85, 255) then
+				continue
+			end
 			local Part = Instance.new("Part")
-			Part.Size = child.Size *2.25 -- experimental
+			Part.Size = child.Size *1 -- experimental (will see if onett becomes online or not)
 			Part.Size += Vector3.new(0,5,0)
 			Part.CanCollide = false
-			Part.Transparency = 1
+			Part.Transparency = .65
 			Part.Anchored = true
 			Part.Position = child.Position
 			Part.Parent = child
@@ -5238,20 +5379,40 @@ modules[tbl.precisePathfind] = function()
 		return true
 	end
 	
+	local function searchForPurpeTargets(crosshairs, c)
+		for _, params in crosshairs do
+			local id = params.id
+			local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
+			if not activeCrosshairs then
+				return false
+			end
+			local preciseData = activeCrosshairs[id]
+	
+			if not preciseData then
+				continue
+			end
+			local child : Part = preciseData.Disk.Part
+			
+			if child.Color == Color3.fromRGB(119, 85, 255) and child.Parent and child ~= c then
+				return child
+			end
+		end
+	end
+	
 	local function pathfind(child, crosshairs)
 		if not child or not child.Parent or not addCrosshairHitboxes(crosshairs) then
 			return
 		end
-	
+		print('pathfinding')
 		local path = pathfinding:CreatePath({
 			AgentCanJump = false,
 			AgentCanClimb = false,
 			AgentHeight = 6,
-			AgentRadius = 9,
+			AgentRadius = 5,
 			Costs = {
 				Crosshair = math.huge
 			},
-			WaypointSpacing = math.huge -- experimental
+			WaypointSpacing = math.huge -- experimental (will see if duck suicides or not)
 		})
 		local p = shared.character.PrimaryPart.Position
 		local childp = child.Position
@@ -5270,6 +5431,7 @@ modules[tbl.precisePathfind] = function()
 		if success then
 			local waypoints = path:GetWaypoints()
 			local start = os.time()
+			require(script.Parent).changeTarget(child)
 			for index, waypoint in (waypoints) do
 				if shouldBreak then
 					return
@@ -5282,7 +5444,14 @@ modules[tbl.precisePathfind] = function()
 			end   
 			if child.Parent then
 				playerMovement.newDestination(child.Position)
+	
+				local newCrosshair = searchForPurpeTargets(crosshairs, child)
+				if newCrosshair then
+					return pathfind(crosshairs, crosshairs)
+				end
+				
 				child.Destroying:Wait()
+				task.wait(.1)
 			end
 		end
 	end
@@ -5444,10 +5613,10 @@ modules[tbl.convert] = function()
 	return convert
 end
 
-modules[tbl.puffshrooms] = function()
-	local script = tbl.puffshrooms
+modules[tbl.pushrooms] = function()
+	local script = tbl.pushrooms
 
-	local puffshroom = {}
+	local pushroom = {}
 	
 	local player = shared.localPlayer
 	
@@ -5457,12 +5626,12 @@ modules[tbl.puffshrooms] = function()
 	local tweenModule = require(components.tween)
 	local keyPress = require(components.keyPress)
 	
-	local puffTools = require(script.puffshroomTools)
+	local puffTools = require(script.pushroomTools)
 	local autofarm = require(script.Parent.autofarm)
 	local rarities = require(script.rarities)
 	
 	local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
-	local puffshroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
+	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	local puffTask
 	local puffsEnabled = false
@@ -5512,14 +5681,14 @@ modules[tbl.puffshrooms] = function()
 		doPuffs()
 	end
 	
-	local function puffshroomAdded()
+	local function pushroomAdded()
 		if not puffsEnabled then
 			return
 		end
 		puffTask:addToQueue()
 	end
 	
-	local function puffshroomsEnding()
+	local function pushroomsEnding()
 		autofarm.togglePuffshrooms(false)
 	end
 	
@@ -5530,27 +5699,27 @@ modules[tbl.puffshrooms] = function()
 		doPuffs()
 	end
 	
-	function puffshroom.changeMaterials()
+	function pushroom.changeMaterials()
 		
 	end
 	
-	function puffshroom.init()
-		puffTask = taskManager.new("puffshroom", 8, startPuffs, puffshroomsEnding)
+	function pushroom.init()
+		puffTask = taskManager.new("pushroom", 8, startPuffs, pushroomsEnding)
 		
-		puffshroomFolder.ChildAdded:Connect(puffshroomAdded)
+		PushroomFolder.ChildAdded:Connect(pushroomAdded)
 	end
 	
-	return puffshroom
+	return pushroom
 end
 
-modules[tbl.puffshroomTools] = function()
-	local script = tbl.puffshroomTools
+modules[tbl.pushroomTools] = function()
+	local script = tbl.pushroomTools
 
 	local module = {}
 	
 	local RarityTable = require(script.Parent.rarities)
 	
-	local puffshroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
+	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	function module.getRarity(puff)
 		return string.split(tostring(puff), "Model")[2]
@@ -5574,7 +5743,7 @@ modules[tbl.puffshroomTools] = function()
 		local BestRarity = nil
 		local BestLevel = nil
 	
-		for index, puff in (puffshroomFolder:GetChildren()) do
+		for index, puff in (PushroomFolder:GetChildren()) do
 			local Rarity = module.getRarity(puff)
 			local Level = module.getLevel(puff)
 			if not Rarity or not Level  then
@@ -5816,4 +5985,11 @@ task.spawn(function()
 	
 	loadFeatures()
 	loadTabs()
+	
+	 local vu = cloneref(game:GetService("VirtualUser"))
+	 client.Idled:Connect(function()
+	     vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	     task.wait(1)
+	     vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	 end)
 end)
