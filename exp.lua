@@ -4464,7 +4464,7 @@ modules[tbl.tween] = function()
 				primaryPart.Velocity = Vector3.new()
 				primaryPart.RotVelocity = Vector3.new()
 				
-				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*350/distance))
+				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*70/distance))
 			end
 		end)
 	end
