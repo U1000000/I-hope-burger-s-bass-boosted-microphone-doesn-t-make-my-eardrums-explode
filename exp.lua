@@ -2,7 +2,7 @@
 	
 	Gui2Lua Winning! ~ Ch0nky Code:tm:
 	
-	25 instances
+	34 instances
 	
 	-> shared.gv2.require("main").printChangelogs()
 	
@@ -23,22 +23,31 @@ local tbl =
 	monsterData = Instance.new("ModuleScript"),
 	getTokens = Instance.new("ModuleScript"),
 	tabs = Instance.new("Folder"),
-	autofarmTab = Instance.new("ModuleScript"),
+	planterTab = Instance.new("ModuleScript"),
 	toysTab = Instance.new("ModuleScript"),
+	questTab = Instance.new("ModuleScript"),
+	autofarmTab = Instance.new("ModuleScript"),
 	Features = Instance.new("Folder"),
 	autofarm = Instance.new("ModuleScript"),
 	helpers = Instance.new("ModuleScript"),
 	precisePathfind = Instance.new("ModuleScript"),
+	autofarmTaskManager = Instance.new("ModuleScript"),
 	toys = Instance.new("ModuleScript"),
 	convert = Instance.new("ModuleScript"),
 	pushrooms = Instance.new("ModuleScript"),
 	pushroomTools = Instance.new("ModuleScript"),
 	rarities = Instance.new("ModuleScript"),
-	mobs = Instance.new("ModuleScript")
+	mobs = Instance.new("ModuleScript"),
+	quest = Instance.new("ModuleScript"),
+	Collect_Pollen = Instance.new("ModuleScript"),
+	Defeat_Monsters = Instance.new("ModuleScript"),
+	Collect_Tokens = Instance.new("ModuleScript"),
+	Collect_Goo = Instance.new("ModuleScript"),
+	planters = Instance.new("ModuleScript")
 }
 
 tbl.bee_swarm_simulator.Name = "bee_swarm_simulator"
-tbl.bee_swarm_simulator.Parent = game:GetService("StarterGui")
+tbl.bee_swarm_simulator.Parent = game:GetService("ServerScriptService")
 
 tbl.components.Name = "components"
 tbl.components.Parent = tbl.bee_swarm_simulator
@@ -76,11 +85,17 @@ tbl.getTokens.Parent = tbl.components
 tbl.tabs.Name = "tabs"
 tbl.tabs.Parent = tbl.bee_swarm_simulator
 
-tbl.autofarmTab.Name = "autofarmTab"
-tbl.autofarmTab.Parent = tbl.tabs
+tbl.planterTab.Name = "planterTab"
+tbl.planterTab.Parent = tbl.tabs
 
 tbl.toysTab.Name = "toysTab"
 tbl.toysTab.Parent = tbl.tabs
+
+tbl.questTab.Name = "questTab"
+tbl.questTab.Parent = tbl.tabs
+
+tbl.autofarmTab.Name = "autofarmTab"
+tbl.autofarmTab.Parent = tbl.tabs
 
 tbl.Features.Name = "Features"
 tbl.Features.Parent = tbl.bee_swarm_simulator
@@ -93,6 +108,9 @@ tbl.helpers.Parent = tbl.autofarm
 
 tbl.precisePathfind.Name = "precisePathfind"
 tbl.precisePathfind.Parent = tbl.autofarm
+
+tbl.autofarmTaskManager.Name = "autofarmTaskManager"
+tbl.autofarmTaskManager.Parent = tbl.autofarm
 
 tbl.toys.Name = "toys"
 tbl.toys.Parent = tbl.Features
@@ -111,6 +129,24 @@ tbl.rarities.Parent = tbl.pushrooms
 
 tbl.mobs.Name = "mobs"
 tbl.mobs.Parent = tbl.Features
+
+tbl.quest.Name = "quest"
+tbl.quest.Parent = tbl.Features
+
+tbl.Collect_Pollen.Name = "Collect Pollen"
+tbl.Collect_Pollen.Parent = tbl.quest
+
+tbl.Defeat_Monsters.Name = "Defeat Monsters"
+tbl.Defeat_Monsters.Parent = tbl.quest
+
+tbl.Collect_Tokens.Name = "Collect Tokens"
+tbl.Collect_Tokens.Parent = tbl.quest
+
+tbl.Collect_Goo.Name = "Collect Goo"
+tbl.Collect_Goo.Parent = tbl.quest
+
+tbl.planters.Name = "planters"
+tbl.planters.Parent = tbl.Features
 
 local modules, cache = {}, {}
 		
@@ -163,13 +199,13 @@ modules[tbl.taskSystem] = function()
 		if oldTask then
 			oldTask:stop()
 		end
-		runningTask = self
-		
-		self.running = true
-		self.mainThread = task.spawn(self.callback)
-		
 		local queuePos = table.find(queue, self)
 		table.remove(queue, queuePos)
+		
+		runningTask = self
+		
+		self.mainThread = task.spawn(self.callback)
+		self.running = true
 	end
 	
 	local function runTasks()
@@ -195,51 +231,57 @@ modules[tbl.taskSystem] = function()
 	end
 	
 	function taskSystem:stop(taskEnded, forceCancel)
-		if not self.running then
-			return
-		end
-		
-		for _, connection in self.connections do
-			connection:Disconnect()
-		end
-	
-		self.running = false
-		tween.stop()
-		playerMovement.stop()
-		
-		self:killSecondaryThreads()
-		
-		if forceCancel then
-			task.cancel(self.mainThread)
-		end
-		
-		if self.endCallback then
-			self.endCallback()
-		end
-		
-		if taskEnded then --task has finished mark running task as nil and run others in queue
-			runningTask = nil
-			runTasks()
-		else
-			if runningTask == self then --bandaid right here i forgot why its here but its important but could be better
-				runningTask = nil
+	--	task.spawn(function() -- new thread cus of thread identities
+			if not self.running then
+				return
 			end
-			
-			task.cancel(self.mainThread)
-			self:addToQueue()
-		end
+			setthreadidentity(8)
+	
+			for _, connection in self.connections do
+				connection:Disconnect()
+			end
+	
+			tween.stop()
+			playerMovement.stop()
+	
+			self:killSecondaryThreads()
+	
+			if forceCancel then
+				task.cancel(self.mainThread)
+			end
+	
+			if self.endCallback then
+				self.endCallback()
+			end
+			self.running = false
+	
+			if taskEnded then --task has finished mark running task as nil and run others in queue
+				runningTask = nil
+				runTasks()
+			else
+				if runningTask == self then --bandaid right here i forgot why its here but its important but could be better
+					runningTask = nil
+				end
+				
+				task.cancel(self.mainThread)
+				self:addToQueue()
+			end
+	--	end)
 	end
 	
 	function taskSystem:killSecondaryThreads()
 		for _, thread in self.secondaryThreads do
-			pcall(task.cancel, thread) -- temp bandaid
+			pcall(task.cancel, thread.startThread)
+			if thread.endCallback then
+				thread.endCallback()
+			end
 		end
 		table.clear(self.secondaryThreads)
 		playerMovement.stop()
 	end
 	
-	function taskSystem:addSecondaryThread(func)
-		table.insert(self.secondaryThreads, task.spawn(func))
+	function taskSystem:addSecondaryThread(func, endfunc)
+		table.insert(self.secondaryThreads, {startThread = task.spawn(func), endCallback = endfunc})
 	end
 	
 	function taskSystem.new(name, priority, callback, endCallback)
@@ -268,6 +310,10 @@ modules[tbl.taskSystem] = function()
 		if runningTask then
 			runningTask:stop()
 		end
+	end
+	
+	function taskSystem.getRunningTask()
+		return runningTask
 	end
 	
 	return taskSystem
@@ -4329,48 +4375,55 @@ modules[tbl.playerMovement] = function()
 	local playerMovement = {}
 	playerMovement.movementFinished = require(script.Parent.signal).new()
 	
-	local connection
+	local moveToConnections = {}
 	local destination
 	
-	function playerMovement.newDestination(destination)
+	local function clearConnections()
+		for _, connection in moveToConnections do
+			connection:Disconnect()
+		end
+		table.clear(moveToConnections)
+	end
+	
+	function playerMovement.newDestination(newDestination)
 		local character = shared.character
-		local humanoid = character and character:FindFirstChild("Humanoid") :: Humanoid
+		local humanoid : Humanoid = character and character:FindFirstChild("Humanoid") 
 	
 		if humanoid then
-			if connection then
-				connection:Disconnect()
-			end
+			playerMovement.stop(nil, 'new')
 			
-			destination = destination
-			humanoid:MoveTo(destination)
+			destination = newDestination
 			
 			local distance = (destination-character.PrimaryPart.Position).Magnitude
 			local time = distance/humanoid.WalkSpeed
+			local moveToConnection
+			
+			local startTime = os.time()
 		
-	
-			connection = humanoid.MoveToFinished:Connect(function(r)
-				if not r then
-					humanoid:MoveTo(destination)
+			moveToConnection = humanoid.MoveToFinished:Connect(function(r)
+				if destination ~= newDestination then  if moveToConnection then moveToConnection:Disconnect() moveToConnection = nil  end return  end
+				if not r and os.time() - startTime < 10 then
+					humanoid:MoveTo(newDestination)
 				else
-					connection:Disconnect()
-					playerMovement.movementFinished:fire()
+					local distance = (character.PrimaryPart.Position-Vector3.new(newDestination.X, character.PrimaryPart.Position.Y, newDestination.Z)).Magnitude
+					if moveToConnection then moveToConnection:Disconnect() moveToConnection = nil  end
+	
+					--if distance >= 8 and os.time() - startTime < 10 then
+					--	return
+					--end
+					playerMovement.movementFinished:fire(true)
 				end
 			end)
-			local oldconnection = connection
-			task.delay(time, function()
-				distance = (destination-character.PrimaryPart.Position).Magnitude
-				if oldconnection == connection and distance <= 4 then
-					playerMovement.movementFinished:fire()
-					connection:Disconnect()
-				end
-			end)
+			table.insert(moveToConnections, moveToConnection)
+			humanoid:MoveTo(newDestination)
 		end
 	end
 	
-	function playerMovement.stop()
-		if connection then
-			connection:Disconnect()
-		end
+	function playerMovement.stop(fireSignal, source)
+		clearConnections()
+		require(script.Parent.signal).killThreads()
+		print(source, 'source')
+	
 		local character = shared.character
 		local humanoid = character and character:FindFirstChild("Humanoid") :: Humanoid
 	
@@ -4411,7 +4464,7 @@ modules[tbl.tween] = function()
 				primaryPart.Velocity = Vector3.new()
 				primaryPart.RotVelocity = Vector3.new()
 				
-				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*100/distance))
+				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*350/distance))
 			end
 		end)
 	end
@@ -4431,11 +4484,14 @@ modules[tbl.signal] = function()
 	local signal = {} 
 	signal.__index = signal
 	
+	local signals = {}
+	
 	function signal.new()
 		local self = {
 			signalCallbacks = {},
 			waitingThreads = {}
 		}
+		table.insert(signals, self)
 	
 		return setmetatable(self, signal)
 	end
@@ -4491,6 +4547,14 @@ modules[tbl.signal] = function()
 			self.waitingThreads[waitingThread] = nil
 	
 			task.spawn(waitingThread, ...)
+		end
+	end
+	
+	function signal.killThreads()
+		for _, self in signals do
+			for waitingThread in self.waitingThreads do
+				self.waitingThreads[waitingThread] = nil
+			end
 		end
 	end
 	
@@ -4572,20 +4636,20 @@ modules[tbl.getTokens] = function()
 	end
 end
 
-modules[tbl.autofarmTab] = function()
-	local script = tbl.autofarmTab
+modules[tbl.planterTab] = function()
+	local script = tbl.planterTab
 
 	local autofarmTab = {}
 	
 	local Features = script.Parent.Parent.Features
 	local components = script.Parent.Parent.components
 	
-	local Autofarm = require(Features.autofarm)
-	local puffshroom = require(Features.pushrooms)
-	local convert = require(Features.convert)
+	local planterFeature = require(Features.planters)
 	
-	local taskSystem = require(components.taskSystem)
 	local uiLibrary = require(components.linoria)
+	
+	local planterTypes = require(game.ReplicatedStorage.PlanterTypes)
+	local planters = planterTypes.GetTypes()
 	
 	local fields = {}
 	
@@ -4597,89 +4661,100 @@ modules[tbl.autofarmTab] = function()
 	
 	local materials = {"Oil", "Enzymes", "Red Extract", "Blue Extract", "Super Smoothie", "Purple Potion"}
 	
-	function autofarmTab.init(window)
-		getFields()
+	local function getPlanters()
+		local t = {}
 		
-		local tab = window:AddTab("Autofarm")
+		for _, planter in planterTypes.GetTypes() do
+			if not planter.Reusable then continue end
+			local name = if planter.DisplayName then planter.DisplayName else _.. " Planter"
+			table.insert(t, name)
+		end
+		
+		return t
+	end
+	local planters = getPlanters()
+	
+	local function createCycle(cycle, tab)
+		local group = tab:AddRightGroupbox('Cycle '..cycle)
+		
+		group:AddToggle('Use hours'..cycle, {
+			Text = "Use hours",
+			Callback = function() end
+		})
+		
+		group:AddToggle('Use percent'..cycle, {
+			Text = "Use percent",
+			Callback = function() end
+		})
+		
+		group:AddDropdown('Planter'..cycle, {
+			Values = planters,
+			Default = 1, 
+			Text = 'Planter',
+			Callback = planterFeature.toggle
+		})
+		
+		group:AddSlider('planterPercent'..cycle, {
+			Text = "Planter Percent",
+			Default = 50,
+			Min = 1,
+			Max = 100,
+			Rounding = 1,
+			Compact = 1,
+			HideMax = false,
+	
+		})
+		group:AddSlider('planterTime'..cycle, {
+			Text = "Harvest Time",
+			Default = 12,
+			Min = 1,
+			Max = 24,
+			Rounding = 1,
+			Compact = 1,
+			HideMax = false,
+	
+		})
+	end
+	
+	
+	function autofarmTab.init(window)	
+		local tab = window:AddTab("Planters")
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
-		local autofarmSettingsBox = tab:AddLeftGroupbox('Settings')
-		local pushroomBox = tab:AddRightGroupbox('Pushrooms')
+		--local autofarmTogglesBox = tab:AddLeftGroupbox('Toggles')
+		local settingsBox = tab:AddLeftGroupbox('Settings')
 	
-		mainGroupBox:AddToggle('Autofarm', {
-			Text = 'Autofarm',
-			Callback = Autofarm.toggled
-		})
-		
-		mainGroupBox:AddToggle('AutoDig', {
-			Text = 'Auto Dig',
-			Callback = Autofarm.autodig
-		})
-		
-		mainGroupBox:AddToggle('ConvertToggle', {
-			Text = 'Convert Backpack',
-			Callback = convert.toggleConvert
-		})
-		
-		mainGroupBox:AddButton({
-			Text = 'destroy ui',
-			Func = function()
-				uiLibrary:Unload()
-				taskSystem.taskSystemDestroy()
-			end,
-			DoubleClick = false,
-			Tooltip = 'gake'
+		mainGroupBox:AddToggle('Auto_Planters', {
+			Text = 'Auto Planters',
+			Callback = planterFeature.toggled
 		})
 	
 		
-		
-		autofarmSettingsBox:AddDropdown('Field', {
-			Values = fields,
+		mainGroupBox:AddDropdown('Planter_Mode', {
+			Values = {"Auto", "Manual"},
 			Default = 1, 
-			Text = 'Field',
-			Callback = Autofarm.changeField
+			Text = 'Mode',
+			Tooltip = "Auto mode is where the field and cycles is done automatically based on settings. Auto is for custom fields and cycles.",
+			Callback = planterFeature.toggle
 		})
-		autofarmSettingsBox:AddToggle('Bubbles', {
-			Text = 'Collect Bubbles',
-			Callback = Autofarm.setBubblesEnabled
-		})
-		autofarmSettingsBox:AddToggle('FuzzyBombs', { --	UNFINISHED
-			Text = 'Get Fuzzy Bombs',
-			Callback = Autofarm.setBubblesEnabled
-		})
-		autofarmSettingsBox:AddToggle('PreciseTargets', {
-			Text = 'Get Precise Targets',
-			Callback = Autofarm.setPreciseEnabled
+		
+		--settings
+		
+		settingsBox:AddToggle('harvestsmoking', {
+			Text = "Don't harvest smoking planters",
+			Callback = function() end
 		})
 	
-		autofarmSettingsBox:AddToggle('farmInMarks', {
-			Text = 'Farm in Marks',
-			Callback = Autofarm.setMarksEnabled
-		})
-		
-		autofarmSettingsBox:AddToggle('farmInMarks', {
-			Text = 'Farm in Flames',
-			Callback = Autofarm.setMarksEnabled
-		})
-		
-		--pushroom side
-		
-		pushroomBox:AddToggle('PuffAutofarm', {
-			Text = 'Autofarm',
-			Callback = Autofarm.toggled
-		})
-		pushroomBox:AddToggle('glitterForPuffs', {
-			Text = 'Glitter high rarity puffs',
-			Callback = Autofarm.toggled,
-			Tooltip = 'Uses glitter in a field if a legendary or mythic pushroom is detected',
-		})
-		pushroomBox:AddDropdown('MaterialsForPuffs', {
-			Values = materials,
-			Tooltip = "Materials to use for pushrooms.",
+		mainGroupBox:AddDropdown('Allowed_Planters', {
+			Values = planters,
 			Default = 1, 
-			Text = 'Materials',
-			AllowNull = true,
-			Callback = puffshroom.changeMaterials
+			Text = 'Allowed Planters',
+			Tooltip = "Auto mode is where the field and cycles is done automatically based on settings. Auto is for custom fields and cycles.",
+			Callback = planterFeature.toggle
 		})
+		
+		for i = 1,3 do
+			createCycle(i, tab)
+		end
 	end
 	
 	return autofarmTab
@@ -4732,6 +4807,191 @@ modules[tbl.toysTab] = function()
 	return autofarmTab
 end
 
+modules[tbl.questTab] = function()
+	local script = tbl.questTab
+
+	local autofarmTab = {}
+	
+	local Features = script.Parent.Parent.Features
+	local components = script.Parent.Parent.components
+	
+	local quest = require(Features.quest)
+	local taskSystem = require(components.taskSystem)
+	local uiLibrary = require(components.linoria)
+	
+	local fields = {}
+	
+	local function getFields()
+		for _, field in workspace.FlowerZones:GetChildren() do
+			table.insert(fields, field.Name)
+		end
+	end
+	
+	local npcs = {"Science Bear", "Polar Bear", "Black Bear", "Dapper Bear", "Bucko Bee", "Riley Bee", "Brown Bear", "Spirit Bear", "Mother Bear", "Onett", "Panda Bear"}
+	
+	function autofarmTab.init(window)
+		getFields()
+		
+		local tab = window:AddTab("Quest")
+		local mainGroupBox = tab:AddLeftGroupbox('Main')
+		local autofarmTogglesBox = tab:AddLeftGroupbox('Toggles')
+		
+	
+		mainGroupBox:AddToggle('Auto Quest', {
+			Text = 'Auto Quest',
+			Callback = quest.toggle
+		})
+		
+		autofarmTogglesBox:AddDropdown('Npcs', {
+			Values = npcs,
+			Default = 0, 
+			Text = 'Npcs',
+			Callback = quest.changeNpcsEnabled,
+			AllowNull = true,
+			Multi = true
+		})
+	end
+	
+	return autofarmTab
+end
+
+modules[tbl.autofarmTab] = function()
+	local script = tbl.autofarmTab
+
+	local autofarmTab = {}
+	
+	local Features = script.Parent.Parent.Features
+	local components = script.Parent.Parent.components
+	
+	local Autofarm = require(Features.autofarm)
+	local puffshroom = require(Features.pushrooms)
+	local convert = require(Features.convert)
+	
+	local taskSystem = require(components.taskSystem)
+	local uiLibrary = require(components.linoria)
+	
+	local fields = {}
+	
+	local function getFields()
+		for _, field in workspace.FlowerZones:GetChildren() do
+			table.insert(fields, field.Name)
+		end
+	end
+	
+	local materials = {"Oil", "Enzymes", "Red Extract", "Blue Extract", "Super Smoothie", "Purple Potion"}
+	
+	function autofarmTab.init(window)
+		getFields()
+		
+		local tab = window:AddTab("Autofarm")
+		local mainGroupBox = tab:AddLeftGroupbox('Main')
+		local autofarmTogglesBox = tab:AddLeftGroupbox('Toggles')
+		local pushroomBox = tab:AddRightGroupbox('Puffshrooms')
+		local settingsBox = tab:AddRightGroupbox('Settings')
+	
+		mainGroupBox:AddToggle('Autofarm', {
+			Text = 'Autofarm',
+			Callback = Autofarm.toggled
+		})
+		
+		mainGroupBox:AddToggle('AutoDig', {
+			Text = 'Auto Dig',
+			Callback = Autofarm.autodig
+		})
+		
+		settingsBox:AddToggle('ConvertToggle', {
+			Text = 'Convert Backpack',
+			Callback = convert.toggleConvert
+		})
+		
+		mainGroupBox:AddButton({
+			Text = 'gake',
+			Func = function()
+				game:GetService("TeleportService"):Teleport(game.PlaceId)
+			end,
+			DoubleClick = false,
+			Tooltip = 'gake'
+		})
+	
+		
+		
+		autofarmTogglesBox:AddDropdown('Field', {
+			Values = fields,
+			Default = 1, 
+			Text = 'Field',
+			Callback = Autofarm.changeField
+		})
+		autofarmTogglesBox:AddToggle('Bubbles', {
+			Text = 'Collect Bubbles',
+			Callback = Autofarm.setBubblesEnabled
+		})
+		autofarmTogglesBox:AddToggle('FuzzyBombs', { --	UNFINISHED
+			Text = 'Get Fuzzy Bombs',
+			Callback = Autofarm.setBubblesEnabled
+		})
+		autofarmTogglesBox:AddToggle('PreciseTargets', {
+			Text = 'Get Precise Targets',
+			Callback = Autofarm.setPreciseEnabled
+		})
+	
+		autofarmTogglesBox:AddToggle('farmInMarks', {
+			Text = 'Farm in Marks',
+			Callback = Autofarm.setMarksEnabled
+		})
+		
+		autofarmTogglesBox:AddToggle('farmInFlames', {
+			Text = 'Farm in Flames',
+			Callback = Autofarm.setFlamesEnabled
+		})
+		
+		autofarmTogglesBox:AddToggle('dupedTokens', {
+			Text = 'Farm Dupe Tokens',
+			Callback = Autofarm.setDupedTokens
+		})
+		
+		--sliders
+		
+		settingsBox:AddToggle('autoWalkspeed', {
+			Text = 'Auto Walkspeed',
+			Callback = function() end
+		})
+	
+		settingsBox:AddSlider('walkspeedSlider', {
+			Text = "Autofarm Speed",
+			Default = 50,
+			Min = 16,
+			Max = 100,
+			Rounding = 1,
+			Compact = 1,
+			HideMax = false,
+			
+		})
+		
+		
+		--pushroom side
+		
+		pushroomBox:AddToggle('PuffAutofarm', {
+			Text = 'Autofarm',
+			Callback = Autofarm.toggled
+		})
+		pushroomBox:AddToggle('glitterForPuffs', {
+			Text = 'Glitter high rarity puffs',
+			Callback = Autofarm.toggled,
+			Tooltip = 'Uses glitter in a field if a legendary or mythic pushroom is detected',
+		})
+		pushroomBox:AddDropdown('MaterialsForPuffs', {
+			Values = materials,
+			Tooltip = "Materials to use for pushrooms.",
+			Default = 0, 
+			Text = 'Materials',
+			AllowNull = true,
+			Callback = puffshroom.changeMaterials
+		})
+	end
+	
+	return autofarmTab
+end
+
 modules[tbl.autofarm] = function()
 	local script = tbl.autofarm
 
@@ -4746,6 +5006,7 @@ modules[tbl.autofarm] = function()
 	local playerMovement = require(components.playerMovement)
 	local autofarmHelpers = require(script.helpers)
 	local preciseMarkGetter = require(script.precisePathfind)
+	local autofarmTaskManager = require(script.autofarmTaskManager)
 	
 	local collectiblesAnimate = require(replicatedStorage.CollectiblesAnimator)
 	local collectModule = require(replicatedStorage.Collectors.LocalCollect)
@@ -4756,9 +5017,10 @@ modules[tbl.autofarm] = function()
 	
 	
 	local fields = workspace:WaitForChild("FlowerZones")
+	local dupedTokens = workspace:WaitForChild("Camera"):WaitForChild("DupedTokens")
 	local PlayerActiveEvent = replicatedStorage:WaitForChild("Events"):WaitForChild("PlayerActivesCommand")
 	
-	local player = shared.localPlayer
+	local player : Player = shared.localPlayer
 	
 	local CoreStats = player:WaitForChild("CoreStats")
 	
@@ -4778,11 +5040,13 @@ modules[tbl.autofarm] = function()
 	local DEFAULT_TOKEN_DISTANCE = 75	
 	local PUFFSHROOM_TOKEN_DISTANCE = 30	
 	
+	local autofarmTasks = {}
 	local autofarmSettings = {
 		field = fields["Dandelion Field"],
 		autodig = false,
 		doPrecise = false,
-		flames = true,
+		farmDupedTokens = false,
+		flames = false,
 		collectBubbles = false,
 		tokenDistance = DEFAULT_TOKEN_DISTANCE,
 		task = {
@@ -4799,6 +5063,8 @@ modules[tbl.autofarm] = function()
 	autofarm.config = autofarmSettings
 	
 	local autofarmTask 
+	
+	
 	
 	function getBuffTime(buffName, convertToHMS)
 		local buff = buffTileModule.GetBuffTile(buffName)
@@ -4840,7 +5106,7 @@ modules[tbl.autofarm] = function()
 		local mark = autofarmHelpers.getMarksWithFlames()
 		if mark then
 			playerMovement.newDestination(mark.Position)
-			playerMovement.movementFinished:wait()
+			playerMovement.movementFinished:wait() 
 		end
 	end
 	
@@ -4858,64 +5124,66 @@ modules[tbl.autofarm] = function()
 			return true
 		end
 		if autofarmHelpers.hasActiveScorchingStar() then
-			return false
+			return false -- false when not debugging
 		end
 	
 		return true
 	end
 	
+	local lastCrosshairAdded = time()
 	local preciseCount = 0
-	
 	local function doPrecise()	
-		if #autofarmSettings.preciseQueue == 0 then
-			return
-		end
+		setthreadidentity(8)
 		local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
+		
+		if #autofarmSettings.preciseQueue == 0 then
+			autofarmTasks.precise:stop(true) 
+		 	return false
+		end
 		if not activeCrosshairs then
-			return table.clear(autofarmSettings.preciseQueue), table.clear(autofarmSettings.allCrosshairs), nextToken()
+			if time() - lastCrosshairAdded < 2.5 then
+				return doPrecise(task.wait())
+			end
+			table.clear(autofarmSettings.preciseQueue) table.clear(autofarmSettings.allCrosshairs) autofarmTasks.precise:stop(true)
+			return false
 		end
 		
-		preciseIndex += 1
-	
-		if not autofarmSettings.preciseQueue[preciseIndex] then
-			preciseIndex = 1
-		end
 		
-		if preciseTargetsDead() then
+		if preciseTargetsDead() or shouldGetPreciseMark() then
 			lastPreciseTarget = nil
 			preciseCount = 0
 		end
-		
-		local preciseParams = 	autofarmSettings.preciseQueue[preciseIndex]	
+	
+		local preciseParams = autofarmSettings.preciseQueue[1]	
 		local preciseData = activeCrosshairs[preciseParams.id]
 	
-		table.remove(autofarmSettings.preciseQueue, preciseIndex)
-	
-		preciseIndex -= 2
-		
-		if not preciseData or preciseData.Disk.Activated or preciseData.Touched or lastPreciseTarget and preciseData.FE ~= lastPreciseTarget.FE then
-			return if #autofarmSettings.preciseQueue > 0 then doPrecise(task.wait()) else nil
+		if preciseData or not preciseData and time() - preciseParams.spawnTime >= 2.5 then
+			table.remove(autofarmSettings.preciseQueue, 1)
 		end
-		
+	
+		if not preciseData or preciseData.Disk.Activated or preciseData.Touched or lastPreciseTarget and preciseData.FE ~= lastPreciseTarget.FE then
+			return doPrecise(task.wait()) 
+		end
+	
 		
 		if shouldGetPreciseMark() then
 			if not preciseParams.ismark then
 				return doPrecise()
 			end
+			print('getting precise mark')
 			targetToken = preciseData.Disk.Part
-	
-			return preciseMarkGetter(preciseData.Disk.Part, autofarmSettings.allCrosshairs)
+			preciseMarkGetter(preciseData.Disk.Part, autofarmSettings.allCrosshairs)
+			print('exit 1.5')
+			return print('exit 2 of precise mark')
 		end
 		lastPreciseTarget = preciseData
 		targetToken = preciseData.Disk.Part
-	
-		preciseCount += 1
-	
+		print('walk to precise')
 		playerMovement.newDestination(targetToken.Position)
-		table.remove(autofarmSettings.allCrosshairs, preciseIndex)
-	
+		table.remove(autofarmSettings.allCrosshairs, 1)
+		preciseCount += 1
 		if autofarmSettings.smartAutofarms.red and preciseCount == 3 then
-			playerMovement.movementFinished:wait()
+			if not playerMovement.movementFinished:wait() then return end
 		
 			local time = game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue() / 1000 + .05
 			task.wait(time)
@@ -4936,34 +5204,40 @@ modules[tbl.autofarm] = function()
 			return
 		end
 		if autofarmSettings.smartAutofarms.red then
-			return autofarmHelpers.darkHeat(flame, autofarmSettings.field)
+			return autofarmHelpers.darkHeat(flame, autofarmSettings.field, autofarmTasks.token)
 		end
 		playerMovement.newDestination(flame.F.Position)
 	end
 	
-	function nextToken()
-		if not autofarmTask.running and not autofarmSettings.puffs then
-			return
+	local function farmDupedTokens()
+		for _, token in dupedTokens:GetChildren() do
+			if token.FrontDecal.Texture =="http://www.roblox.com/asset/?id=5877939956" then
+				playerMovement.newDestination(token.Position)
+				if not playerMovement.movementFinished:wait() then return end
+				task.wait(1) break
+			end
 		end
-		if #autofarmSettings.preciseQueue > 0 and autofarmSettings.doPrecise and debug.getupvalue(preciseCrosshairsModule.InitBeams, 1) then
-			return doPrecise()
-		end
+	end
+	
+	local function nextToken()
+		setthreadidentity(8)
+		--if not autofarmTask.running and not autofarmSettings.puffs and not  then
+		--	return false
+		--end
+	
 		if autofarmSettings.flames then
 			farmFlame()
 		end
-		if #tokens == 0 then
-			return 
+		if autofarmSettings.farmDupedTokens then
+			farmDupedTokens()
 		end
-		--tokenIndex += 1
-	
-		--if not tokens[tokenIndex] then
-		--	tokenIndex = 1
-		--end
+		if #tokens == 0 then
+			return autofarmHelpers.moveToRandomPos(autofarmSettings.field)
+		end
 		
 		local target = tokens[1]
 		
 		table.remove(tokens, 1)
-	
 	
 		if not autofarmHelpers.canGetItem(target, autofarmSettings.field, autofarmSettings.tokenDistance, autofarmSettings.puffs) then
 			return nextToken() -- this causes the freeze sometimes
@@ -4973,23 +5247,39 @@ modules[tbl.autofarm] = function()
 		playerMovement.newDestination(targetToken.Position)
 	end
 	
+	local function endAutofarm()
+		autofarmTaskManager.pause()
+		local task = autofarmTaskManager.getTask() 
+		if task and task.running then
+			task:stop(nil, true)
+		end
+		player.DevComputerMovementMode = Enum.DevComputerMovementMode.UserChoice
+		player.DevTouchMovementMode = Enum.DevTouchMovementMode.UserChoice
+	end
+	
+	
 	local function startAutofarm()
+		endAutofarm()
+	
+		player.DevComputerMovementMode = Enum.DevComputerMovementMode.Scriptable
+		player.DevTouchMovementMode = Enum.DevTouchMovementMode.Scriptable
+	
 		tween.tween(autofarmSettings.field.CFrame)
 		tween.tweenComplete:wait()
 		task.wait(.5)
 		PlayerActiveEvent:FireServer({Name = "Sprinkler Builder"}) -- add auto sprinkler later 
-		
-		nextToken()
-		
-		while true do
-			local playerPos = shared.character.PrimaryPart.Position
-			
-			local distance = targetToken and (Vector3.new(targetToken.Position.X, playerPos.Y, targetToken.Position.Z) - playerPos).Magnitude or 0
-			local huamnodi = shared.character.Humanoid.WalkSpeed
-			if not targetToken or not targetToken.Parent or distance and distance < math.max(huamnodi/12, 3.25) then
-				nextToken()
+	
+		autofarmTaskManager.reset()
+		autofarmTaskManager.resume()
+	
+		autofarmTasks.token:addToQueue()
+	
+		while task.wait(1) do
+			local pos = shared.character.PrimaryPart.Position
+			local field = autofarmHelpers.posToField(pos)
+			if not field or (field.Instance ~= autofarmSettings.field) then
+				tween.tween(autofarmSettings.field.CFrame)
 			end
-			task.wait()
 		end
 	end 
 	
@@ -5001,6 +5291,10 @@ modules[tbl.autofarm] = function()
 	end
 	
 	function autofarm.setField(field)
+		if type(field) == 'string' then
+			autofarmSettings.field = fields[field]
+			return
+		end
 		autofarmSettings.field = field
 	end
 	
@@ -5017,7 +5311,7 @@ modules[tbl.autofarm] = function()
 		if value then
 			autofarmTask:addToQueue()
 		else
-			autofarmTask:stop(true)
+			autofarmTask:stop(true, true)
 		end
 	end
 	
@@ -5049,21 +5343,64 @@ modules[tbl.autofarm] = function()
 		autofarmHelpers.markToggle(value)
 	end
 	
+	function autofarm.setFlamesEnabled(value)
+		autofarmSettings.flames = value
+	end
+	
+	function autofarm.setDupedTokens(value)
+		autofarmSettings.farmDupedTokens = value
+	end
+	
+	local function startLoop(callback)
+		targetToken = nil
+	
+		while true do
+			local playerPos = shared.character.PrimaryPart.Position
+	
+			local distance = targetToken and (Vector3.new(targetToken.Position.X, playerPos.Y, targetToken.Position.Z) - playerPos).Magnitude or 0
+			local humanoid = shared.character.Humanoid.WalkSpeed
+			if not targetToken or not targetToken.Parent or targetToken.Transparency == 1 or distance and distance < math.max(humanoid/12, 3.25) then
+				if callback() == false then return end
+				local t = autofarmTaskManager.getTask() 
+				if t then
+					print(t.name)
+				end
+			end
+			task.wait()
+		end
+	end
+	
+	local function startPrecise()
+		startLoop(doPrecise)
+	end
+	
+	local function startToken()
+		startLoop(nextToken)
+	end
+	
 	function autofarm.init()
+		autofarmTasks = {
+			token = autofarmTaskManager.new('tokens', 1, startToken),
+			precise = autofarmTaskManager.new('precise', 2, startPrecise)
+		}
+		
 		autofarmHelpers.init()
-		autofarmTask = taskSystem.new("Autofarm", 1, startAutofarm)
+		autofarmTask = taskSystem.new("Autofarm", 1, startAutofarm, endAutofarm)
 		
 		local old = nil; old = hookfunction(preciseCrosshairsModule.Make, function(...)
 			local params = ...;
 	
 			if params.Player == shared.localPlayer then
-				table.insert(autofarmSettings.preciseQueue, {id = params.ID, ismark = params.Mark})
-				table.insert(autofarmSettings.allCrosshairs, {id = params.ID, ismark = params.Mark})
+				lastCrosshairAdded = time()
+				table.insert(autofarmSettings.preciseQueue, {id = params.ID, ismark = params.Mark, spawnTime = time()})
+				table.insert(autofarmSettings.allCrosshairs, {id = params.ID, ismark = params.Mark})	
+				autofarmTasks.precise:addToQueue()
 			end
 	
 			return old(...);
 		end)
 		autofarm.startAutofarm = startAutofarm
+		autofarm.endAutofarm = endAutofarm
 	end
 	
 	function autofarm.changeTarget(v)
@@ -5122,6 +5459,26 @@ modules[tbl.helpers] = function()
 			end
 		end
 		return true
+	end
+	
+	function module.get_random_position(instance)
+		local size = instance.Size;
+		local position = instance.Position;
+	
+		local min_x = position.X - size.X / 2;
+		local max_x = position.X + size.X / 2;
+		local min_z = position.Z - size.Z / 2;
+		local max_z = position.Z + size.Z / 2;
+	
+		local random_x = math.random() * (max_x - min_x) + min_x;
+		local random_z = math.random() * (max_z - min_z) + min_z;
+	
+		return Vector3.new(random_x, position.Y, random_z);
+	end
+	
+	function module.moveToRandomPos(field)
+		playerMovement.newDestination(module.get_random_position(field))
+		playerMovement.movementFinished:wait()
 	end
 	
 	function module.getMarksWithFlames() 
@@ -5201,6 +5558,10 @@ modules[tbl.helpers] = function()
 	
 	local function tokenAdded(t)
 		table.insert(tokens, t)
+		table.sort(tokens, function(a, b)
+			local ref = shared.character.PrimaryPart.Position
+			return (a.Position - ref).Magnitude < (b.Position - ref).Magnitude
+		end)
 	end
 	
 	local function tokensRemoved(t)
@@ -5224,6 +5585,9 @@ modules[tbl.helpers] = function()
 		end
 		local activeFlames = debug.getupvalue(localFlames.IncrementTicks, 4)
 		
+		local bestDistance, bestFlame
+		local playerPos = shared.character.PrimaryPart.Position
+		
 		for _, id in flameids do
 			local flameData = activeFlames[id]
 			table.remove(flameids, _)
@@ -5231,8 +5595,13 @@ modules[tbl.helpers] = function()
 			if not flameData or not flameData.M or not module.canGetItem(flameData.F, field, maxDistance, puffs) then
 				continue
 			end
-			return flameData
+			local distance = (flameData.F.Position - playerPos).Magnitude
+			if not bestDistance or distance < bestDistance then
+				bestDistance = distance
+				bestFlame = flameData
+			end
 		end
+		return bestFlame
 	end
 	
 	local radius = 18
@@ -5270,7 +5639,7 @@ modules[tbl.helpers] = function()
 		return position
 	end
 	
-	function module.darkHeat(flameData, field)
+	function module.darkHeat(flameData, field, tokentask)
 		if flameData.D then
 			return
 		end
@@ -5284,6 +5653,7 @@ modules[tbl.helpers] = function()
 			BodyGyro.MaxTorque = Vector3.new(0, math.huge, 0)
 		end
 		local BodyGyro = hrp.BodyGyro
+		
 		local heartbeat = RunService.Heartbeat:Connect(function ()
 			local forwardVector = (hrp.Position - v.Position).Unit
 			local rightVector = forwardVector:Cross(Vector3.new(0,1,0))
@@ -5292,6 +5662,8 @@ modules[tbl.helpers] = function()
 			local cframe = CFrame.fromMatrix(hrp.Position, -rightVector, upVector)
 			BodyGyro.CFrame = cframe
 		end)
+		tokentask:addConnection(heartbeat)
+		
 		local p = createFlamesParts(v, field)
 		if not p or not v or not v.Parent then
 			heartbeat:Disconnect()
@@ -5300,10 +5672,14 @@ modules[tbl.helpers] = function()
 		end
 	
 		playerMovement.newDestination(p)
-		playerMovement.movementFinished:wait()
+		if not playerMovement.movementFinished:wait() then return heartbeat:Disconnect() end
 		heartbeat:Disconnect()
 		BodyGyro:Destroy()
-		task.wait(.06)
+		if module.hasActiveScorchingStar() then
+			task.wait(.5)
+		--else
+		--	task.wait(.1)
+		end
 	end
 	
 	function module.init()
@@ -5342,6 +5718,8 @@ modules[tbl.precisePathfind] = function()
 	local playerMovement = require(script.Parent.Parent.Parent.components.playerMovement)
 	local preciseCrosshairsModule = require(game.ReplicatedStorage.LocalFX.LocalTargetPracticeBeam)
 	
+	local autofarmtaskmanager = require(script.Parent.autofarmTaskManager)
+	
 	local function addCrosshairHitboxes(crosshairs)
 		print('making hitboxes')
 		for _, params in crosshairs do
@@ -5356,17 +5734,24 @@ modules[tbl.precisePathfind] = function()
 				continue
 			end
 			local child : Part = preciseData.Disk.Part
+	
 			if child:FindFirstChild("PathfindingModifierPart") then
+				if preciseData.Touched then
+					child.PathfindingModifierPart:Destroy()
+				end
+				continue
+			end
+			if preciseData.Touched then
 				continue
 			end
 			if child.Color == Color3.fromRGB(119, 85, 255) then
 				continue
 			end
 			local Part = Instance.new("Part")
-			Part.Size = child.Size *1 -- experimental (will see if onett becomes online or not)
+			Part.Size = child.Size 
 			Part.Size += Vector3.new(0,5,0)
 			Part.CanCollide = false
-			Part.Transparency = .65
+			Part.Transparency = 1
 			Part.Anchored = true
 			Part.Position = child.Position
 			Part.Parent = child
@@ -5392,18 +5777,16 @@ modules[tbl.precisePathfind] = function()
 				continue
 			end
 			local child : Part = preciseData.Disk.Part
-			
+			--if child.Transparency > 0 then
+			--	continue
+			--end
 			if child.Color == Color3.fromRGB(119, 85, 255) and child.Parent and child ~= c then
 				return child
 			end
 		end
 	end
 	
-	local function pathfind(child, crosshairs)
-		if not child or not child.Parent or not addCrosshairHitboxes(crosshairs) then
-			return
-		end
-		print('pathfinding')
+	local function getPath(child)
 		local path = pathfinding:CreatePath({
 			AgentCanJump = false,
 			AgentCanClimb = false,
@@ -5417,45 +5800,265 @@ modules[tbl.precisePathfind] = function()
 		local p = shared.character.PrimaryPart.Position
 		local childp = child.Position
 		local success, errorMessage = pcall(function()
-			path:ComputeAsync(p, Vector3.new(childp.X, p.Y, childp.Z))
-		end)
-		local shouldBreak 
-	
-		path.Blocked:Once(function()
-			print('blocked redoing')
-			shouldBreak = true
-			return pathfind(child, crosshairs)
+			path:ComputeAsync(p, childp)
 		end)
 		
+		return if success and path.Status == Enum.PathStatus.Success then path elseif errorMessage then warn(errorMessage) else nil
+	end
 	
-		if success then
-			local waypoints = path:GetWaypoints()
-			local start = os.time()
-			require(script.Parent).changeTarget(child)
-			for index, waypoint in (waypoints) do
-				if shouldBreak then
-					return
-				end
-				if not child or not child.Parent or child.Transparency == 1 or os.time()-start >=12 then
-					return 
-				end
-				playerMovement.newDestination(waypoint.Position)
-				playerMovement.movementFinished:wait()
-			end   
-			if child.Parent then
-				playerMovement.newDestination(child.Position)
+	local function pathfind(child, crosshairs, path)
+		local hitboxstatus =  addCrosshairHitboxes(crosshairs)
+		if not child or not child.Parent or not hitboxstatus then
+			return print(child, child.Parent, hitboxstatus)
+		end
+		local path : Path? = path or getPath(child)
+		if not path then return print('no path') end
+		print('a path exist')
+		local p = shared.character.PrimaryPart.Position
+		local childp = child.Position
 	
-				local newCrosshair = searchForPurpeTargets(crosshairs, child)
-				if newCrosshair then
-					return pathfind(crosshairs, crosshairs)
-				end
-				
-				child.Destroying:Wait()
-				task.wait(.1)
+		local pathBlocked 
+		local preciseTask = autofarmtaskmanager.getTask()
+		if not preciseTask or preciseTask.name ~= 'precise' then return print('isnt precise task', preciseTask.name) end
+		local c = nil; c = path.Blocked:Once(function()
+			print('path blocked')
+			pathBlocked = true
+			playerMovement.stop(true, 'blcoked')
+			print('new pathfind')
+			pathfind(child, crosshairs)
+		end)
+		preciseTask:addConnection(c)
+		
+		local waypoints = path:GetWaypoints()
+		
+		require(script.Parent).changeTarget(child)
+		for index, waypoint in (waypoints) do
+			local Part = Instance.new("Part")
+			Part.Size = child.Size 
+			Part.Size += Vector3.new(0,10,0)
+			Part.CanCollide = false
+			Part.Transparency = 0
+			Part.Anchored = true
+			Part.Position = waypoint.Position
+			Part.Parent = child
+			Part.Name = 'f'
+		end   
+		print('walk started')
+		for index, waypoint in (waypoints) do
+			if pathBlocked then
+				return print('block return')
+			end
+			if not child or not child.Parent then
+				return c:Disconnect(), print('no child or parent' ,child, child.Parent)
+			end
+			playerMovement.newDestination(waypoint.Position)
+			print('1')
+			playerMovement.movementFinished:wait() 
+			print('2')
+		end   
+		print('walk complete')
+		c:Disconnect()
+		c = nil
+		local newCrosshair = searchForPurpeTargets(crosshairs, child)
+		local newPath = if newCrosshair then getPath(newCrosshair) else nil
+		if newCrosshair and newPath then
+			print('new crosshair')
+			return pathfind(newCrosshair, crosshairs, newPath)
+		end
+		if child.Parent then
+			if (shared.character.PrimaryPart.Position - child.Position).Magnitude >= 5 then
+				print('distance precise')
+				return pathfind(child, crosshairs)
+			end
+			print('destroy wait')
+			child.Destroying:Wait()
+			task.wait(.1)
+		end
+		print('exited function precise pathfind')
+	end
+	return pathfind
+end
+
+modules[tbl.autofarmTaskManager] = function()
+	local script = tbl.autofarmTaskManager
+
+	-- temp bandaid
+	-- temp bandaid
+	-- temp bandaid
+	-- temp bandaid
+	-- the whole script is a temp bandaid
+	local taskSystem = {}
+	taskSystem.__index = taskSystem
+	
+	local queue = {}
+	local runningTask
+	
+	local playerMovement = require(script.Parent.Parent.Parent.components.playerMovement)
+	local tween = require(script.Parent.Parent.Parent.components.tween)
+	local signal = require(script.Parent.Parent.Parent.components.signal)
+	
+	local dead = false
+	
+	local function getBestTask()
+		local bestLevel = 0
+		local bestTask
+		for _, task in queue do
+			if task.priorityLevel > bestLevel and task ~= runningTask then
+				bestTask = task
+				bestLevel = task.priorityLevel
+			end
+		end
+		return bestTask
+	end
+	
+	local function startTask(self)
+		if dead then 
+			return
+		end
+		local oldTask = runningTask
+		runningTask = self --prob can remove this cus idk why theres 2 lmao
+	
+		if oldTask then
+			oldTask:stop()
+		end
+		runningTask = self
+	
+		self.mainThread = task.spawn(self.callback)
+		self.running = true
+	
+		local queuePos = table.find(queue, self)
+		table.remove(queue, queuePos)
+	end
+	
+	local function runTasks()
+		local task = getBestTask()
+	
+		if task then
+			if not runningTask or task.priorityLevel > runningTask.priorityLevel then
+				startTask(task)
 			end
 		end
 	end
-	return pathfind
+	
+	function taskSystem:addToQueue()	
+		if table.find(queue, self) or self.running then
+			return false
+		end
+	
+		table.insert(queue, self)
+	
+		runTasks()
+	
+		return true 
+	end
+	
+	function taskSystem:stop(taskEnded, forceCancel)
+		task.spawn(function() -- new thread cus of thread identities
+			if not self.running then
+				return
+			end
+			setthreadidentity(8)
+			signal.killThreads()
+	
+			for _, connection in self.connections do
+				connection:Disconnect()
+				table.remove(self.connections, _)
+			end
+	
+			tween.stop()
+			playerMovement.stop()
+	
+			self:killSecondaryThreads()
+			if forceCancel then
+				task.cancel(self.mainThread)
+			end
+	
+			if self.endCallback then
+				self.endCallback()
+			end
+			self.running = false
+	
+			if taskEnded then --task has finished mark running task as nil and run others in queue
+				runningTask = nil
+	
+				runTasks()
+			else
+				if runningTask == self then --bandaid right here i forgot why its here but its important but could be better
+					runningTask = nil
+				end
+	
+				task.cancel(self.mainThread)
+	
+				self:addToQueue()
+			end
+		end)
+	end
+	
+	function taskSystem:addConnection(connection)
+		table.insert(self.connections, connection)
+	end
+	
+	function taskSystem:killSecondaryThreads()
+		for _, thread in self.secondaryThreads do
+			pcall(task.cancel, thread) -- temp bandaid
+		end
+		table.clear(self.secondaryThreads)
+		playerMovement.stop()
+	end
+	
+	function taskSystem:addSecondaryThread(func)
+		table.insert(self.secondaryThreads, task.spawn(func))
+	end
+	
+	function taskSystem.new(name, priority, callback, endCallback)
+		local self = setmetatable({}, taskSystem)
+	
+		self.connections = {}
+		self.secondaryThreads = {}
+	
+		self.priorityLevel = priority
+		self.name = name
+		self.callback = callback
+		self.endCallback = endCallback
+	
+		return self
+	end
+	
+	function taskSystem.taskSystemDestroy()
+		dead = true
+		table.clear(queue)
+		if runningTask then
+			runningTask:stop(true,true)
+		end
+	end
+	
+	function taskSystem.reset()
+		table.clear(queue)
+		if runningTask then
+			runningTask:stop(true,true)
+		end
+		runningTask = nil
+	end
+	
+	function taskSystem.pause()
+		dead = true
+	end
+	
+	function taskSystem.resume()
+		dead = false
+	end
+	
+	function taskSystem.restart()
+		if runningTask then
+			runningTask:stop()
+		end
+	end
+	
+	function taskSystem.getTask()
+		return runningTask
+	end
+	
+	return taskSystem
 end
 
 modules[tbl.toys] = function()
@@ -5486,6 +6089,8 @@ modules[tbl.toys] = function()
 	local toysToGet = {}
 	
 	local function getToy(toy)
+		set_thread_identity(2)
+	
 		local canUse = onCooldownFunc(nil, toysFolder[toy])
 	
 		while canUse  do
@@ -5511,12 +6116,12 @@ modules[tbl.toys] = function()
 	
 	local function loop()
 		while task.wait(1) do
-			set_thread_identity(2)
 	
 			for toy, enabled in toySettings.toysEnabled do
 				if not enabled then
 					continue
 				end
+				set_thread_identity(2)
 	
 				local canUse = onCooldownFunc(nil, toysFolder[toy])
 				if not table.find(toysToGet, toy) and canUse and not toyTask.running then
@@ -5524,7 +6129,6 @@ modules[tbl.toys] = function()
 					toyTask:addToQueue()
 				end
 			end
-			set_thread_identity(8)
 		end
 	end
 	
@@ -5552,7 +6156,7 @@ modules[tbl.convert] = function()
 
 	local convert = {}
 	
-	local player = shared.localPlayer
+	local player : Player = shared.localPlayer
 	
 	local CoreStats = player:WaitForChild("CoreStats")
 	local Pollen = CoreStats:WaitForChild("Pollen")
@@ -5583,9 +6187,11 @@ modules[tbl.convert] = function()
 	end
 	
 	local function convertBag()
-		while task.wait(1) do
+		local convertPosition = SpawnPos.Value + Vector3.new(0,0,9)
+		local distance = player:DistanceFromCharacter(convertPosition.Position)
+	
+		while task.wait(1) or distance >= 4 do
 			if activateButton.Text ~= "Stop Making Honey" then
-				local convertPosition = SpawnPos.Value + Vector3.new(0,0,9)
 	
 				tweenModule.tween(convertPosition)
 				tweenModule.tweenComplete:wait()
@@ -5616,7 +6222,7 @@ end
 modules[tbl.pushrooms] = function()
 	local script = tbl.pushrooms
 
-	local pushroom = {}
+	local puffshroom = {}
 	
 	local player = shared.localPlayer
 	
@@ -5631,7 +6237,7 @@ modules[tbl.pushrooms] = function()
 	local rarities = require(script.rarities)
 	
 	local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
-	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
+	local puffshroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	local puffTask
 	local puffsEnabled = false
@@ -5671,7 +6277,7 @@ modules[tbl.pushrooms] = function()
 		
 		autofarm.setField(stem)
 		
-		puffTask:addSecondaryThread(autofarm.startAutofarm)
+		puffTask:addSecondaryThread(autofarm.startAutofarm, autofarm.endAutofarm)
 		
 		target.Destroying:Wait()
 		local lootTime = puffTools.getAutoLootTime(level, rarity)
@@ -5681,14 +6287,14 @@ modules[tbl.pushrooms] = function()
 		doPuffs()
 	end
 	
-	local function pushroomAdded()
+	local function puffshroomAdded()
 		if not puffsEnabled then
 			return
 		end
 		puffTask:addToQueue()
 	end
 	
-	local function pushroomsEnding()
+	local function puffshroomsEnding()
 		autofarm.togglePuffshrooms(false)
 	end
 	
@@ -5699,17 +6305,17 @@ modules[tbl.pushrooms] = function()
 		doPuffs()
 	end
 	
-	function pushroom.changeMaterials()
+	function puffshroom.changeMaterials()
 		
 	end
 	
-	function pushroom.init()
-		puffTask = taskManager.new("pushroom", 8, startPuffs, pushroomsEnding)
+	function puffshroom.init()
+		puffTask = taskManager.new("puffshroom", 8, startPuffs, puffshroomsEnding)
 		
-		PushroomFolder.ChildAdded:Connect(pushroomAdded)
+		puffshroomFolder.ChildAdded:Connect(puffshroomAdded)
 	end
 	
-	return pushroom
+	return puffshroom
 end
 
 modules[tbl.pushroomTools] = function()
@@ -5719,7 +6325,7 @@ modules[tbl.pushroomTools] = function()
 	
 	local RarityTable = require(script.Parent.rarities)
 	
-	local PushroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
+	local puffshroomFolder = workspace:WaitForChild("Happenings"):WaitForChild("Puffshrooms")
 	
 	function module.getRarity(puff)
 		return string.split(tostring(puff), "Model")[2]
@@ -5743,7 +6349,7 @@ modules[tbl.pushroomTools] = function()
 		local BestRarity = nil
 		local BestLevel = nil
 	
-		for index, puff in (PushroomFolder:GetChildren()) do
+		for index, puff in (puffshroomFolder:GetChildren()) do
 			local Rarity = module.getRarity(puff)
 			local Level = module.getLevel(puff)
 			if not Rarity or not Level  then
@@ -5821,15 +6427,16 @@ modules[tbl.mobs] = function()
 	local mobTask 
 	local mobsToKill = {}
 	
-	local mobTask 
-	
 	local function killMob(monsterData)
+		setthreadidentity(2)
+	
 		local isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
 		local cframe = monsterData.territory.CFrame
 	
 		tweenModule.tween(cframe)
 		tweenModule.tweenComplete:wait()
-	
+		
+		
 		while not isOnCooldown  do
 			local character = shared.character
 			local humanoid : Humanoid = character and character:FindFirstChild("Humanoid")
@@ -5841,24 +6448,28 @@ modules[tbl.mobs] = function()
 			isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
 			task.wait(1)
 		end
+		
+		setthreadidentity(8)
+		
 		task.wait(1)
 		local pos = shared.character and shared.character.PrimaryPart
 		local tokens = tokens(pos.Position, 60)
 		
 		for _, token in tokens do
-			print('1')
+			if not token.Parent then continue end
 			playerMovement.newDestination(token.Position)
-			playerMovement.movementFinished:wait()
-			print('2')
+			if not playerMovement.movementFinished:wait() then return end
 		end
 	end
 	
 	local function startGettingMobs()
 		for _, mob in mobsToKill do
-			table.remove(mobsToKill, table.find(mobsToKill, mob))
+			table.remove(mobsToKill, _)
 			killMob(mob)
 			task.wait(.5)
 		end
+		table.clear(mobsToKill)
+		print('end mob')
 		mobTask:stop(true)
 	end 
 	
@@ -5868,6 +6479,7 @@ modules[tbl.mobs] = function()
 	
 			for spawner, monsterData in mobData do
 				local enabled = Options.Monsters.Value[monsterData.monsterType]
+				
 				if not enabled then
 					continue
 				end
@@ -5875,10 +6487,34 @@ modules[tbl.mobs] = function()
 				local isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
 				if not table.find(mobsToKill, monsterData) and not isOnCooldown and not mobTask.running then
 					table.insert(mobsToKill, monsterData)
-					mobTask:addToQueue()
 				end
 			end
+			if #mobsToKill > 0 then
+				mobTask:addToQueue()
+			end
 			set_thread_identity(8)
+		end
+	end
+	
+	function mob.addMob(mobType, count, addToQueue)
+		set_thread_identity(2)
+	
+		local x = 0
+		for spawner, monsterData in mobData do
+			if x > count then
+				break
+			end
+			
+			local enabled = monsterData.monsterType == mobType
+			if not enabled then
+				continue
+			end
+			
+			local isOnCooldown = mobTools.CheckSpawnerCooldown(monsterData.spawner.Name)
+			if not table.find(mobsToKill, monsterData) and not isOnCooldown and not mobTask.running then
+				x += 1
+				table.insert(mobsToKill, monsterData)
+			end
 		end
 	end
 	
@@ -5888,17 +6524,356 @@ modules[tbl.mobs] = function()
 		end
 	end
 	
+	function mob.getMobsInQueue()
+		return mobsToKill	
+	end
+	
 	function mob.changeMobsEnabled()
 		mobSettings.mobsEnabled = Options.Monsters.Value
 	end
 	
 	function mob.init()
 		mobTask = taskSystem.new("mobs", 4, startGettingMobs)
+		mob.start = startGettingMobs
 		
 		task.spawn(loop)
 	end
 	
 	return mob
+end
+
+modules[tbl.quest] = function()
+	local script = tbl.quest
+
+	local quest = {}
+	
+	local components = script.Parent.Parent.components
+	
+	local taskSystem = require(components.taskSystem)
+	local tween = require(components.tween)
+	local playerMovement = require(components.playerMovement)
+	local keyPress = require(components.keyPress)
+	
+	local replicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local clientStatCache = require(replicatedStorage.ClientStatCache)
+	local questModule = require(replicatedStorage.Quests)
+	
+	local npcContainer = workspace:WaitForChild("NPCs")
+	
+	local questSettings = {
+		npcsEnabled = nil,
+	}
+	local questTask 
+	
+	local function resetSettings()
+		
+	end
+	
+	local function getTasks(bear)
+		local activeTasks = {}
+		local stats = clientStatCache:Get()
+		local activeQuest= stats.Quests.Active
+		set_thread_identity(2)
+	
+	
+		for index, data in (activeQuest) do
+			local questName = data.Name
+			local questData = questModule:Get(questName)
+			if questData then
+				if questData.NPC ~= bear then
+					continue
+				end
+	
+				local Task = questData.Tasks
+				local progress = questModule:Progress(questName, stats)
+	
+				if progress then
+					for index, taskData in (Task) do
+						if progress[index][1] < 1 then
+							table.insert(activeTasks, taskData)
+						end
+					end
+				end
+			end
+		end
+		set_thread_identity(8)
+	
+		return activeTasks
+	end
+	
+	local function talkToNpc(npc)
+		local platform = npcContainer[npc].Platform
+		local npcButton = shared.localPlayer.PlayerGui.ScreenGui.NPC
+		while not npcButton.Visible do
+			local goalCFrame = CFrame.new(platform.Position + Vector3.new(0,5,0))
+			tween.tween(goalCFrame)
+			tween.tweenComplete:wait()
+			keyPress.pressE()
+			task.wait(.1)
+		end
+	
+		setthreadidentity(2)
+		while npcButton.Visible do
+			firesignal(npcButton.ButtonOverlay.MouseButton1Click)
+	
+	
+			task.wait(.1)
+		end
+		if #getTasks(npc) == 0 then
+			return talkToNpc(npc)
+		end
+	end
+	
+	local function waitForTaskComplete(taskData, npc) --complex way to see if complete
+		while task.wait(.5) do
+			local tasks = getTasks(npc)
+			local taskExist = false
+			
+			for _, task in tasks do
+				if task == taskData then
+					taskExist = true
+					break
+				end
+			end
+			if not taskExist then
+				return
+			end
+		end
+	end
+	
+	local function doTask(npc, tasks)
+		local inCompatiableQuest 
+		for _, taskData in tasks do
+			local taskModule = if script:FindFirstChild(taskData.Type) then require(script[taskData.Type]) else nil
+			if not taskModule then
+				inCompatiableQuest = true
+				continue
+			end
+			taskModule.startTask(taskData, questTask)
+			waitForTaskComplete(taskData, npc)
+			
+			questTask:killSecondaryThreads()
+		end
+		
+		if inCompatiableQuest then
+			questTask:stop(true)
+		end
+	end
+	
+	local function startQuest()
+		if not questSettings.npcsEnabled then
+			return questTask:stop(true)
+		end
+		for npc, value in questSettings.npcsEnabled do
+			if not value then
+				continue
+			end
+			local npcTasks = getTasks(npc)
+			if #npcTasks == 0 then
+				talkToNpc(npc)
+			end
+			doTask(npc, npcTasks)
+		end
+		startQuest(task.wait())
+	end
+	
+	function quest.init()
+		questTask = taskSystem.new("Quest", 2, startQuest)
+	end
+	
+	function quest.changeNpcsEnabled(t)
+		questSettings.npcsEnabled = t
+		if questTask.running then
+			questTask:stop()
+		end
+	end
+	
+	function quest.toggle(value)
+		if value then
+			questTask:addToQueue()
+		else
+			questTask:stop(true, true)
+			resetSettings()
+		end
+	end
+	
+	return quest
+end
+
+modules[tbl.Collect_Pollen] = function()
+	local script = tbl.Collect_Pollen
+
+	local module = {}
+	
+	local autofarm = require(script.Parent.Parent.autofarm)
+	
+	local colorsField = {
+		Red = "Pepper Patch",
+		Blue = "Pine Tree Forest",
+		White = "Spider Field"
+	}
+	
+	local function getField(taskData)
+		if taskData.Zone then
+			return taskData.Zone
+		end
+		if taskData.Color then
+			return colorsField[taskData.Color]
+		end
+		return Options.Field.Value
+	end
+	
+	function module.startTask(taskData, questTask)
+		local field = getField(taskData)
+	
+		autofarm.setField(field)
+		questTask:addSecondaryThread(autofarm.startAutofarm, autofarm.endAutofarm)
+	end
+	
+	return module
+end
+
+modules[tbl.Defeat_Monsters] = function()
+	local script = tbl.Defeat_Monsters
+
+	local module = {}
+	
+	local autofarm = require(script.Parent.Parent.autofarm)
+	local mobKiller = require(script.Parent.Parent.mobs)
+	
+	function module.startTask(taskData, questTask)
+		questTask:addSecondaryThread(autofarm.startAutofarm, autofarm.endAutofarm)
+		while true do
+			mobKiller.addMob(taskData.MonsterType, taskData.Amount, true)
+			task.wait(1)
+		end
+	end
+	
+	return module
+end
+
+modules[tbl.Collect_Tokens] = function()
+	local script = tbl.Collect_Tokens
+
+	local module = {}
+	
+	local autofarm = require(script.Parent.Parent.autofarm)
+	
+	local colorsField = {
+		['Sunflower Seed'] = "Sunflower Field",
+		['Blueberry'] = "Pine Tree Forest",
+		['Strawberry'] = "Strawberry Field",
+		['Pineapple'] = "Pineapple Patch"
+	}
+	
+	local function getField(taskData)
+		if colorsField[taskData.Tag] then
+			return colorsField[taskData.Tag]
+		end
+		return Options.Field.Value
+	end
+	
+	function module.startTask(taskData, questTask)
+		local field = getField(taskData)
+	
+		autofarm.setField(field)
+		questTask:addSecondaryThread(autofarm.startAutofarm, autofarm.endAutofarm)
+	end
+	
+	return module
+end
+
+modules[tbl.Collect_Goo] = function()
+	local script = tbl.Collect_Goo
+
+	local module = {}
+	
+	local autofarm = require(script.Parent.Parent.autofarm)
+	
+	local colorsField = {
+		Red = "Pepper Patch",
+		Blue = "Pine Tree Forest",
+		White = "Spider Field"
+	}
+	
+	local function getField(taskData)
+		if taskData.Zone then
+			return taskData.Zone
+		end
+		if taskData.Color then
+			return colorsField[taskData.Color]
+		end
+		return Options.Field.Value
+	end
+	
+	function module.startTask(taskData, questTask)
+		local field = getField(taskData)
+	
+		autofarm.setField(field)
+		questTask:addSecondaryThread(autofarm.startAutofarm, autofarm.endAutofarm)
+	end
+	
+	return module
+end
+
+modules[tbl.planters] = function()
+	local script = tbl.planters
+
+	local planter = {}
+	
+	local player = shared.localPlayer
+	
+	local components = script.Parent.Parent.components
+	
+	local taskManager = require(components.taskSystem)
+	local tweenModule = require(components.tween)
+	local keyPress = require(components.keyPress)
+	
+	local planterTask
+	
+	local planterConfig = {
+		enabled = false,
+		mode = 'Auto',
+		allowedPlanters = {}
+	}
+	
+	local function doAutoPlanters()
+		
+	end
+	
+	local function doManualPlanters()
+		
+	end
+	
+	local function startPlanters()
+		
+	end
+	
+	function planter.changeMaterials()
+		
+	end
+	
+	function planter.toggle(value)
+		planterConfig.enabled = value
+	end
+	
+	function planter.toggleAllowedPlanters(value)
+		planterConfig.allowedPlanters = value
+	end
+	
+	local function loop()
+		while task.wait(1) do
+			
+		end
+	end
+	
+	function planter.init()
+		planterTask = taskManager.new("planter", 9, startPlanters)	
+		task.spawn(loop)	
+	end
+	
+	return planter
 end
 
 task.spawn(function()
@@ -5939,6 +6914,18 @@ task.spawn(function()
 		end
 	end
 	
+	local function autofarmWalkspeed()
+		if not Options.walkspeedSlider.Value then
+			return
+		end
+		local speed = Options.walkspeedSlider.Value
+		local humanoid = shared.character.Humanoid
+		if humanoid.WalkSpeed == speed then
+			return
+		end
+		humanoid.WalkSpeed = speed
+	end
+	
 	function PrintTable(t, indent)
 		indent = indent or 0
 		local prefix = string.rep("  ", indent)
@@ -5959,6 +6946,8 @@ task.spawn(function()
 	
 	players.LocalPlayer.CharacterAdded:Connect(function(character)
 		shared.character = character
+		autofarmWalkspeed()
+		character:WaitForChild("Humanoid"):GetPropertyChangedSignal("WalkSpeed"):Connect(autofarmWalkspeed)
 	end)
 	
 	players.LocalPlayer.CharacterRemoving:Connect(function(character)
@@ -5986,10 +6975,11 @@ task.spawn(function()
 	loadFeatures()
 	loadTabs()
 	
-	 local vu = cloneref(game:GetService("VirtualUser"))
-	 client.Idled:Connect(function()
-	     vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-	     task.wait(1)
-	     vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-	 end)
+	local vu = cloneref(game:GetService("VirtualUser"))
+	shared.localPlayer.Idled:Connect(function()
+	    vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+		task.wait(1)
+		vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	end)
+	shared.character:WaitForChild("Humanoid"):GetPropertyChangedSignal("WalkSpeed"):Connect(autofarmWalkspeed)
 end)
