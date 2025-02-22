@@ -2,7 +2,7 @@
 	
 	Gui2Lua Winning! ~ Ch0nky Code:tm:
 	
-	34 instances
+	35 instances
 	
 	-> shared.gv2.require("main").printChangelogs()
 	
@@ -22,6 +22,7 @@ local tbl =
 	keyPress = Instance.new("ModuleScript"),
 	monsterData = Instance.new("ModuleScript"),
 	getTokens = Instance.new("ModuleScript"),
+	buffComponents = Instance.new("ModuleScript"),
 	tabs = Instance.new("Folder"),
 	planterTab = Instance.new("ModuleScript"),
 	toysTab = Instance.new("ModuleScript"),
@@ -81,6 +82,9 @@ tbl.monsterData.Parent = tbl.components
 
 tbl.getTokens.Name = "getTokens"
 tbl.getTokens.Parent = tbl.components
+
+tbl.buffComponents.Name = "buffComponents"
+tbl.buffComponents.Parent = tbl.components
 
 tbl.tabs.Name = "tabs"
 tbl.tabs.Parent = tbl.bee_swarm_simulator
@@ -4464,7 +4468,7 @@ modules[tbl.tween] = function()
 				primaryPart.Velocity = Vector3.new()
 				primaryPart.RotVelocity = Vector3.new()
 				
-				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*70/distance))
+				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*350/distance))
 			end
 		end)
 	end
@@ -4634,6 +4638,40 @@ modules[tbl.getTokens] = function()
 		end
 		return tokenTable
 	end
+end
+
+modules[tbl.buffComponents] = function()
+	local script = tbl.buffComponents
+
+	local module = {}
+	local replicatedStorage = game:GetService('ReplicatedStorage')
+	
+	local serverTime = require(replicatedStorage.OsTime)
+	local timeToString = require(replicatedStorage.TimeString)
+	local buffTileModule = require(replicatedStorage.Gui.TileDisplay.BuffTile)
+	
+	
+	function module.getBuffTime(buffName, convertToHMS)
+		local buff = buffTileModule.GetBuffTile(buffName)
+		if not buff or not buff.TimerDur or not buff.TimerStart then 
+			return 0 
+		end
+	
+		local toReturn = buff.TimerDur - (math.floor(serverTime()) - buff.TimerStart)
+		if convertToHMS then 
+			toReturn = timeToString(toReturn) 
+		end
+	
+		return toReturn
+	end
+	
+	function module.getBuffStack(buffName)
+		local buff = buffTileModule.GetBuffTile(buffName)
+	
+		return (buff and tonumber(buff.Combo)) or 0
+	end
+	
+	return module
 end
 
 modules[tbl.planterTab] = function()
@@ -5004,6 +5042,8 @@ modules[tbl.autofarm] = function()
 	local taskSystem = require(components.taskSystem)
 	local tween = require(components.tween)
 	local playerMovement = require(components.playerMovement)
+	local buffComponents = require(components.buffComponents)
+	
 	local autofarmHelpers = require(script.helpers)
 	local preciseMarkGetter = require(script.precisePathfind)
 	local autofarmTaskManager = require(script.autofarmTaskManager)
@@ -5011,10 +5051,6 @@ modules[tbl.autofarm] = function()
 	local collectiblesAnimate = require(replicatedStorage.CollectiblesAnimator)
 	local collectModule = require(replicatedStorage.Collectors.LocalCollect)
 	local preciseCrosshairsModule = require(replicatedStorage.LocalFX.LocalTargetPracticeBeam)
-	local serverTime = require(replicatedStorage.OsTime)
-	local timeToString = require(replicatedStorage.TimeString)
-	local buffTileModule = require(replicatedStorage.Gui.TileDisplay.BuffTile)
-	
 	
 	local fields = workspace:WaitForChild("FlowerZones")
 	local dupedTokens = workspace:WaitForChild("Camera"):WaitForChild("DupedTokens")
@@ -5064,28 +5100,6 @@ modules[tbl.autofarm] = function()
 	
 	local autofarmTask 
 	
-	
-	
-	function getBuffTime(buffName, convertToHMS)
-		local buff = buffTileModule.GetBuffTile(buffName)
-		if not buff or not buff.TimerDur or not buff.TimerStart then 
-			return 0 
-		end
-	
-		local toReturn = buff.TimerDur - (math.floor(serverTime()) - buff.TimerStart)
-		if convertToHMS then 
-			toReturn = timeToString(toReturn) 
-		end
-	
-		return toReturn
-	end
-	
-	function getBuffStack(buffName)
-		local buff = buffTileModule.GetBuffTile(buffName)
-	
-		return (buff and tonumber(buff.Combo)) or 0
-	end
-	
 	local function shouldConvertPrecise()
 		local fullPercent = backpack.Pollen.Value / backpack.Capacity.Value
 		
@@ -5111,8 +5125,8 @@ modules[tbl.autofarm] = function()
 	end
 	
 	local function shouldGetPreciseMark()
-		local precionCount = getBuffStack("Precision")
-		local precisionTime = getBuffTime("Precision")
+		local precionCount = buffComponents.getBuffStack("Precision")
+		local precisionTime = buffComponents.getBuffTime("Precision")
 			
 		if precionCount < 10 then
 			return false
@@ -5120,7 +5134,7 @@ modules[tbl.autofarm] = function()
 		if precisionTime < 25 then
 			return false
 		end
-		if getBuffStack("Red Boost") < 10 or getBuffTime("Red Boost") <= 6 then
+		if buffComponents.getBuffStack("Red Boost") < 10 or buffComponents.getBuffTime("Red Boost") <= 6 then
 			return true
 		end
 		if autofarmHelpers.hasActiveScorchingStar() then
@@ -5132,22 +5146,101 @@ modules[tbl.autofarm] = function()
 	
 	local lastCrosshairAdded = time()
 	local preciseCount = 0
-	local function doPrecise()	
-		setthreadidentity(8)
-		local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
-		
+	
+	local function preciseValidator(activeCrosshairs)
+	
 		if #autofarmSettings.preciseQueue == 0 then
-			autofarmTasks.precise:stop(true) 
-		 	return false
+			return false
 		end
 		if not activeCrosshairs then
 			if time() - lastCrosshairAdded < 2.5 then
-				return doPrecise(task.wait())
+				return true
 			end
-			table.clear(autofarmSettings.preciseQueue) table.clear(autofarmSettings.allCrosshairs) autofarmTasks.precise:stop(true)
+			table.clear(autofarmSettings.preciseQueue) table.clear(autofarmSettings.allCrosshairs) 
+			return false
+		end
+		return true
+	end
+	
+	local function doPreciseMarks()
+		setthreadidentity(8)
+	
+		local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
+		if preciseValidator(activeCrosshairs) then
+			if not activeCrosshairs then return doPreciseMarks(task.wait()) end
+		else
+			autofarmTasks.preciseMark:stop(true)
 			return false
 		end
 		
+		local preciseParams = autofarmSettings.preciseQueue[1]	
+		local preciseData = activeCrosshairs[preciseParams.id]
+	
+		if preciseData or not preciseData and time() - preciseParams.spawnTime >= 2.5 then
+			table.remove(autofarmSettings.preciseQueue, 1)
+		end
+	
+		if not preciseData or preciseData.Disk.Activated or preciseData.Touched or not preciseParams.ismark then
+			return doPreciseMarks(task.wait()) 
+		end
+		preciseMarkGetter.addCrosshairHitboxes(autofarmSettings.allCrosshairs)
+		local crosshairPart = preciseData.Disk.Part
+		local path = preciseMarkGetter.getPath(crosshairPart)
+		if not path then
+			return doPreciseMarks(task.wait())
+		end
+		
+		targetToken = crosshairPart
+		
+		local pathBlocked
+		
+		local waypoints = path:GetWaypoints()
+		local c = nil; c = path.Blocked:Once(function()
+			pathBlocked = true
+			playerMovement.stop(true, 'blcoked')
+			c = nil
+			doPreciseMarks()
+		end)
+		autofarmTasks.preciseMark:addConnection(c)
+		
+		for _, waypoint in waypoints do
+			if pathBlocked or not crosshairPart.Parent then
+				if c then c:Disconnect() c = nil end
+				return if not crosshairPart.Parent then doPreciseMarks() else nil
+			end
+			preciseMarkGetter.addCrosshairHitboxes(autofarmSettings.allCrosshairs)
+			playerMovement.newDestination(waypoint.Position)
+	 		playerMovement.movementFinished:wait()
+		end
+		if c then c:Disconnect() c = nil end
+		
+		local newCrosshair = preciseMarkGetter.searchForPurpleTargets(autofarmSettings.allCrosshairs, crosshairPart)
+		if newCrosshair then
+			return doPreciseMarks()
+		end
+		if crosshairPart.Parent then
+			crosshairPart.Destroying:Wait()
+		end
+		
+		autofarmTasks.preciseMark:stop(true)
+		print('stop precise marks 2')
+	
+		return false
+	end
+	
+	local function doPrecise()	
+		setthreadidentity(8)
+		print('do precise')
+		local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
+		if preciseValidator(activeCrosshairs) then
+		
+			if not activeCrosshairs then return doPrecise(task.wait()), print('do precise') end
+		else
+			print('stop precise')
+			autofarmTasks.precise:stop(true)
+			return false
+		end
+			
 		
 		if preciseTargetsDead() or shouldGetPreciseMark() then
 			lastPreciseTarget = nil
@@ -5165,17 +5258,6 @@ modules[tbl.autofarm] = function()
 			return doPrecise(task.wait()) 
 		end
 	
-		
-		if shouldGetPreciseMark() then
-			if not preciseParams.ismark then
-				return doPrecise()
-			end
-			print('getting precise mark')
-			targetToken = preciseData.Disk.Part
-			preciseMarkGetter(preciseData.Disk.Part, autofarmSettings.allCrosshairs)
-			print('exit 1.5')
-			return print('exit 2 of precise mark')
-		end
 		lastPreciseTarget = preciseData
 		targetToken = preciseData.Disk.Part
 		print('walk to precise')
@@ -5183,7 +5265,7 @@ modules[tbl.autofarm] = function()
 		table.remove(autofarmSettings.allCrosshairs, 1)
 		preciseCount += 1
 		if autofarmSettings.smartAutofarms.red and preciseCount == 3 then
-			if not playerMovement.movementFinished:wait() then return end
+			playerMovement.movementFinished:wait() 
 		
 			local time = game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue() / 1000 + .05
 			task.wait(time)
@@ -5191,6 +5273,7 @@ modules[tbl.autofarm] = function()
 			if preciseTargetsDead() then
 				preciseCount = 0
 				if shouldConvertPrecise() and targetToken.Parent then
+					print('destoy wait')
 					return targetToken.Destroying:Wait()
 				end
 				moveToBestMarks()
@@ -5213,7 +5296,7 @@ modules[tbl.autofarm] = function()
 		for _, token in dupedTokens:GetChildren() do
 			if token.FrontDecal.Texture =="http://www.roblox.com/asset/?id=5877939956" then
 				playerMovement.newDestination(token.Position)
-				if not playerMovement.movementFinished:wait() then return end
+				playerMovement.movementFinished:wait() 
 				task.wait(1) break
 			end
 		end
@@ -5381,7 +5464,8 @@ modules[tbl.autofarm] = function()
 	function autofarm.init()
 		autofarmTasks = {
 			token = autofarmTaskManager.new('tokens', 1, startToken),
-			precise = autofarmTaskManager.new('precise', 2, startPrecise)
+			precise = autofarmTaskManager.new('precise', 2, startPrecise),
+			preciseMark = autofarmTaskManager.new('preciseMark', 3, doPreciseMarks)
 		}
 		
 		autofarmHelpers.init()
@@ -5394,13 +5478,24 @@ modules[tbl.autofarm] = function()
 				lastCrosshairAdded = time()
 				table.insert(autofarmSettings.preciseQueue, {id = params.ID, ismark = params.Mark, spawnTime = time()})
 				table.insert(autofarmSettings.allCrosshairs, {id = params.ID, ismark = params.Mark})	
-				autofarmTasks.precise:addToQueue()
+				if not params.Mark and not shouldGetPreciseMark() then
+					autofarmTasks.precise:addToQueue()
+				elseif params.Mark and shouldGetPreciseMark() then
+					autofarmTasks.preciseMark:addToQueue()
+				end
 			end
 	
 			return old(...);
 		end)
 		autofarm.startAutofarm = startAutofarm
 		autofarm.endAutofarm = endAutofarm
+		
+		task.spawn(function()
+			while task.wait(3) do
+					printtable(autofarmTaskManager.getQueue())
+				
+			end
+		end)
 	end
 	
 	function autofarm.changeTarget(v)
@@ -5720,7 +5815,9 @@ modules[tbl.precisePathfind] = function()
 	
 	local autofarmtaskmanager = require(script.Parent.autofarmTaskManager)
 	
-	local function addCrosshairHitboxes(crosshairs)
+	local module = {}
+	
+	function module.addCrosshairHitboxes(crosshairs)
 		print('making hitboxes')
 		for _, params in crosshairs do
 			local id = params.id
@@ -5748,10 +5845,10 @@ modules[tbl.precisePathfind] = function()
 				continue
 			end
 			local Part = Instance.new("Part")
-			Part.Size = child.Size 
+			Part.Size = child.Size * 1.2
 			Part.Size += Vector3.new(0,5,0)
 			Part.CanCollide = false
-			Part.Transparency = 1
+			Part.Transparency = 0
 			Part.Anchored = true
 			Part.Position = child.Position
 			Part.Parent = child
@@ -5764,7 +5861,7 @@ modules[tbl.precisePathfind] = function()
 		return true
 	end
 	
-	local function searchForPurpeTargets(crosshairs, c)
+	function module.searchForPurpleTargets(crosshairs, c)
 		for _, params in crosshairs do
 			local id = params.id
 			local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
@@ -5780,13 +5877,15 @@ modules[tbl.precisePathfind] = function()
 			--if child.Transparency > 0 then
 			--	continue
 			--end
-			if child.Color == Color3.fromRGB(119, 85, 255) and child.Parent and child ~= c then
-				return child
+			if child.Color == Color3.fromRGB(119, 85, 255) and child.Parent then
+				if not c.Parent or c ~= child then
+					return child
+				end
 			end
 		end
 	end
 	
-	local function getPath(child)
+	function module.getPath(child)
 		local path = pathfinding:CreatePath({
 			AgentCanJump = false,
 			AgentCanClimb = false,
@@ -5876,7 +5975,7 @@ modules[tbl.precisePathfind] = function()
 		end
 		print('exited function precise pathfind')
 	end
-	return pathfind
+	return module
 end
 
 modules[tbl.autofarmTaskManager] = function()
@@ -5922,12 +6021,13 @@ modules[tbl.autofarmTaskManager] = function()
 			oldTask:stop()
 		end
 		runningTask = self
-	
-		self.mainThread = task.spawn(self.callback)
-		self.running = true
-	
 		local queuePos = table.find(queue, self)
 		table.remove(queue, queuePos)
+		self.running = true
+	
+		self.mainThread = task.spawn(self.callback)
+	
+		
 	end
 	
 	local function runTasks()
@@ -6052,6 +6152,10 @@ modules[tbl.autofarmTaskManager] = function()
 		if runningTask then
 			runningTask:stop()
 		end
+	end
+	
+	function taskSystem.getQueue()
+		return queue
 	end
 	
 	function taskSystem.getTask()
@@ -6822,6 +6926,8 @@ modules[tbl.planters] = function()
 
 	local planter = {}
 	
+	local replicatedStorage = game:GetService("ReplicatedStorage")
+	
 	local player = shared.localPlayer
 	
 	local components = script.Parent.Parent.components
@@ -6829,14 +6935,39 @@ modules[tbl.planters] = function()
 	local taskManager = require(components.taskSystem)
 	local tweenModule = require(components.tween)
 	local keyPress = require(components.keyPress)
+	local buffComponents = require(components.buffComponents)
+	
+	local nectarTypes = require(replicatedStorage.NectarTypes).GetTypes()
 	
 	local planterTask
 	
 	local planterConfig = {
 		enabled = false,
 		mode = 'Auto',
-		allowedPlanters = {}
+		allowedPlanters = {},
+		nectarData = {}
 	}
+	local nectars = {"Satifying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
+	
+	local function getNectarTimes()
+		local t = {}
+		for nectar, data in nectarTypes do
+			t[nectar.. " Nectar"] = buffComponents.getBuffTime(nectar.." Nectar")
+		end
+		return t
+	end
+	
+	local function sortNectars(a, b)
+		local nectar1 = planterConfig.nectarData[a]
+		local nectar2 = planterConfig.nectarData[b]
+		
+		return nectar1.priority > nectar2.priority
+	end
+	
+	local function getPlanters()
+		table.sort(sortNectars)
+		local nectarTimes = getNectarTimes()
+	end
 	
 	local function doAutoPlanters()
 		
@@ -6869,6 +7000,14 @@ modules[tbl.planters] = function()
 	end
 	
 	function planter.init()
+		for nectar, data in nectarTypes do
+			planterConfig.nectarData[nectar] = {
+				priority = math.random(5,10),
+				enabled = true
+			}
+		end
+		
+		
 		planterTask = taskManager.new("planter", 9, startPlanters)	
 		task.spawn(loop)	
 	end
