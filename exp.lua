@@ -1239,7 +1239,7 @@ modules[tbl.linoria] = function()
 			end;
 	
 			SatVibMap.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
 						local MinX = SatVibMap.AbsolutePosition.X;
 						local MaxX = MinX + SatVibMap.AbsoluteSize.X;
@@ -1261,7 +1261,7 @@ modules[tbl.linoria] = function()
 			end);
 	
 			HueSelectorInner.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
 						local MinY = HueSelectorInner.AbsolutePosition.Y;
 						local MaxY = MinY + HueSelectorInner.AbsoluteSize.Y;
@@ -1293,7 +1293,7 @@ modules[tbl.linoria] = function()
 	
 			if TransparencyBoxInner then
 				TransparencyBoxInner.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
 							local MinX = TransparencyBoxInner.AbsolutePosition.X;
 							local MaxX = MinX + TransparencyBoxInner.AbsoluteSize.X;
@@ -1312,7 +1312,7 @@ modules[tbl.linoria] = function()
 			end;
 	
 			Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					local AbsPos, AbsSize = PickerFrameOuter.AbsolutePosition, PickerFrameOuter.AbsoluteSize;
 	
 					if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
@@ -1473,7 +1473,7 @@ modules[tbl.linoria] = function()
 				end;
 	
 				Label.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						ModeButton:Select();
 						Library:AttemptSave();
 					end;
@@ -1599,7 +1599,7 @@ modules[tbl.linoria] = function()
 	
 						if Input.UserInputType == Enum.UserInputType.Keyboard then
 							Key = Input.KeyCode.Name;
-						elseif Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						elseif Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 							Key = 'MB1';
 						elseif Input.UserInputType == Enum.UserInputType.MouseButton2 then
 							Key = 'MB2';
@@ -1645,7 +1645,7 @@ modules[tbl.linoria] = function()
 					KeyPicker:Update();
 				end;
 	
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					local AbsPos, AbsSize = ModeSelectOuter.AbsolutePosition, ModeSelectOuter.AbsoluteSize;
 	
 					if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
@@ -2770,9 +2770,9 @@ modules[tbl.linoria] = function()
 						ButtonLabel.TextColor3 = Selected and Library.AccentColor or Library.FontColor;
 						Library.RegistryMap[ButtonLabel].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
 					end;
-	
+					
 					ButtonLabel.InputBegan:Connect(function(Input)
-						if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 							local Try = not Selected;
 	
 							if Dropdown:GetActiveValues() == 1 and (not Try) and (not Info.AllowNull) then
@@ -2884,7 +2884,7 @@ modules[tbl.linoria] = function()
 			end);
 	
 			InputService.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
 	
 					if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
@@ -3826,7 +3826,7 @@ modules[tbl.linoria] = function()
 			end;
 	
 			TabButton.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					Tab:ShowTab();
 				end;
 			end);
