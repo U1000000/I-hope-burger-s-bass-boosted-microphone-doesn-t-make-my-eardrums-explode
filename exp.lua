@@ -1099,9 +1099,11 @@ modules[tbl.linoria] = function()
 					);
 	
 					Button.InputBegan:Connect(function(Input)
-						if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+						if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
 							return
 						end
+						
+						
 	
 						Callback()
 					end)
@@ -1274,9 +1276,9 @@ modules[tbl.linoria] = function()
 					Library:AttemptSave();
 				end;
 			end);
-	
 			DisplayFrame.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+				if 		(Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame()) or Input.UserInputType == Enum.UserInputType.Touch and not Library:MouseIsOverOpenedFrame()
+	 then
 					if PickerFrameOuter.Visible then
 						ColorPicker:Hide()
 					else
@@ -1567,7 +1569,8 @@ modules[tbl.linoria] = function()
 			local Picking = false;
 	
 			PickOuter.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+				if 		(Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame()) or Input.UserInputType == Enum.UserInputType.Touch and not Library:MouseIsOverOpenedFrame()
+	 then
 					Picking = true;
 	
 					DisplayLabel.Text = '';
@@ -1839,13 +1842,13 @@ modules[tbl.linoria] = function()
 						return false
 					end
 	
-					if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+					if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
 						return false
 					end
 	
 					return true
 				end
-	
+				
 				Button.Outer.InputBegan:Connect(function(Input)
 					if not ValidateClick(Input) then return end
 					if Button.Locked then return end
@@ -2264,7 +2267,8 @@ modules[tbl.linoria] = function()
 			end;
 	
 			ToggleRegion.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+				if 		(Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame()) or Input.UserInputType == Enum.UserInputType.Touch and not Library:MouseIsOverOpenedFrame()
+	 then
 					Toggle:SetValue(not Toggle.Value) -- Why was it not like this from the start?
 					Library:AttemptSave();
 				end;
@@ -2451,7 +2455,8 @@ modules[tbl.linoria] = function()
 			end;
 	
 			SliderInner.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+				if 		(Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame()) or Input.UserInputType == Enum.UserInputType.Touch and not Library:MouseIsOverOpenedFrame()
+	 then
 					local mPos = Mouse.X;
 					local gPos = Fill.Size.X.Offset;
 					local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
@@ -2868,7 +2873,8 @@ modules[tbl.linoria] = function()
 			end;
 	
 			DropdownOuter.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+				if 		(Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame()) or Input.UserInputType == Enum.UserInputType.Touch and not Library:MouseIsOverOpenedFrame()
+	 then
 					if ListOuter.Visible then
 						Dropdown:CloseDropdown();
 					else
@@ -3783,7 +3789,8 @@ modules[tbl.linoria] = function()
 					end;
 	
 					Button.InputBegan:Connect(function(Input)
-						if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+						if 		(Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame()) or Input.UserInputType == Enum.UserInputType.Touch and not Library:MouseIsOverOpenedFrame()
+	 then
 							Tab:Show();
 							Tab:Resize();
 						end;
