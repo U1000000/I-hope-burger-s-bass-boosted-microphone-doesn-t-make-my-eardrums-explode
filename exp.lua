@@ -215,9 +215,8 @@ modules[tbl.taskSystem] = function()
 		table.remove(queue, queuePos)
 		
 		runningTask = self
-		
-		self.mainThread = task.spawn(self.callback)
 		self.running = true
+		self.mainThread = task.spawn(self.callback)
 	end
 	
 	local function runTasks()
@@ -4992,7 +4991,8 @@ modules[tbl.autofarmTab] = function()
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		local autofarmTogglesBox = tab:AddLeftGroupbox('Toggles')
 		local pushroomBox = tab:AddRightGroupbox('Puffshrooms')
-		local settingsBox = tab:AddRightGroupbox('Settings')
+		local settingsBox = tab:AddRightGroupbox('Autofarm Settings')
+		local convertSettingsBox = tab:AddRightGroupbox('Convert Settings')
 	
 		mainGroupBox:AddToggle('Autofarm', {
 			Text = 'Autofarm',
@@ -5004,9 +5004,32 @@ modules[tbl.autofarmTab] = function()
 			Callback = Autofarm.autodig
 		})
 		
-		settingsBox:AddToggle('ConvertToggle', {
+		convertSettingsBox:AddToggle('ConvertToggle', {
 			Text = 'Convert Backpack',
 			Callback = convert.toggleConvert
+		})
+		
+		convertSettingsBox:AddToggle('ConvertTimeToggle', {
+			Text = 'Convert after Time limit',
+			Callback = convert.toggleConvertTimeLimit
+		})
+		
+		convertSettingsBox:AddToggle('convertBalloon', {
+			Text = 'Convert Hive Balloon',
+			Callback = convert.toggleBalloon
+		})
+	
+		
+		convertSettingsBox:AddSlider('convertTimeSlider', {
+			Text = "Convert Time",
+			Default = 20,
+			Min = 1,
+			Max = 120,
+			Tooltip = "Time to convert (in minutes)",
+			Rounding = 1,
+			Compact = 1,
+			HideMax = false,
+			Callback = convert.toggleTime
 		})
 		
 		mainGroupBox:AddButton({
@@ -5018,6 +5041,17 @@ modules[tbl.autofarmTab] = function()
 			Tooltip = 'gake'
 		})
 	
+		mainGroupBox:AddButton({
+			Text = 'debug',
+			Func = function()
+				local runningtask = taskSystem.getRunningTask()
+				if runningtask then
+					printtable(runningtask)
+				end
+			end,
+			DoubleClick = false,
+			Tooltip = 'gake'
+		})
 		
 		
 		autofarmTogglesBox:AddDropdown('Field', {
@@ -6339,6 +6373,11 @@ modules[tbl.convert] = function()
 	
 	local convertTask
 	local convertToggled
+	local convertWhenTime = false
+	local convertBalloon
+	
+	local convertTime = 20 * 60
+	local lastConvert = time()
 	
 	local function gethiveballoon()
 		for _,balloon in (game.Workspace.Balloons.HiveBalloons:GetChildren()) do
@@ -6358,11 +6397,14 @@ modules[tbl.convert] = function()
 		if Pollen.Value >= Capacity.Value then
 			convertTask:addToQueue()
 		elseif convertTask.running and Pollen.Value == 0 then
-			while gethiveballoon() do
-				task.wait(1)
+			if convertBalloon then
+				while gethiveballoon() do
+					task.wait(1)
+				end
 			end
 			
 			task.wait(4) --will make this automatic based on when the convert trails disappear
+			lastConvert = time()
 			convertTask:stop(true, true)
 		end
 	end
@@ -6390,10 +6432,31 @@ modules[tbl.convert] = function()
 		checkConvert()
 	end
 	
+	function convert.toggleConvertTimeLimit(value)
+		convertWhenTime = value
+	end
+	
+	function convert.toggleTime(value)
+		convertTime = value * 60
+	end
+	
+	function convert.toggleBalloon(value)
+		convertBalloon = value
+	end
+	
+	local function loop()
+		while task.wait(1) do
+			if convertWhenTime and (time() - lastConvert) >= convertTime then
+				convertTask:addToQueue()
+			end
+		end
+	end
+	
 	function convert.init()
 		convertTask = taskManager.new("convert", 9, convertBag)
 		
 		checkConvert()
+		task.spawn(loop)
 		Pollen.Changed:Connect(checkConvert)
 		Capacity.Changed:Connect(checkConvert)
 	end
@@ -6640,7 +6703,7 @@ modules[tbl.mobs] = function()
 		for _, token in tokens do
 			if not token.Parent then continue end
 			playerMovement.newDestination(token.Position)
-			if not playerMovement.movementFinished:wait() then return end
+			playerMovement.movementFinished:wait() 
 		end
 	end
 	
