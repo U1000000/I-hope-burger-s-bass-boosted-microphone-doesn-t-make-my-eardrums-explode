@@ -6340,6 +6340,17 @@ modules[tbl.convert] = function()
 	local convertTask
 	local convertToggled
 	
+	local function gethiveballoon()
+		for _,balloon in (game.Workspace.Balloons.HiveBalloons:GetChildren()) do
+			if balloon:FindFirstChild("BalloonRoot") then
+				if balloon.BalloonRoot.CFrame.p.X == player.SpawnPos.Value.p.X then
+					return true
+				end
+			end
+		end
+		return false
+	end
+	
 	local function checkConvert()
 		if not convertToggled then
 			return
@@ -6347,6 +6358,10 @@ modules[tbl.convert] = function()
 		if Pollen.Value >= Capacity.Value then
 			convertTask:addToQueue()
 		elseif convertTask.running and Pollen.Value == 0 then
+			while gethiveballoon() do
+				task.wait(1)
+			end
+			
 			task.wait(4) --will make this automatic based on when the convert trails disappear
 			convertTask:stop(true, true)
 		end
@@ -6380,6 +6395,7 @@ modules[tbl.convert] = function()
 		
 		checkConvert()
 		Pollen.Changed:Connect(checkConvert)
+		Capacity.Changed:Connect(checkConvert)
 	end
 	
 	return convert
