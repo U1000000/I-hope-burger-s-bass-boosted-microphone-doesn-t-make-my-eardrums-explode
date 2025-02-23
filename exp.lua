@@ -2,7 +2,7 @@
 	
 	Gui2Lua Winning! ~ Ch0nky Code:tm:
 	
-	35 instances
+	37 instances
 	
 	-> shared.gv2.require("main").printChangelogs()
 	
@@ -23,6 +23,8 @@ local tbl =
 	monsterData = Instance.new("ModuleScript"),
 	getTokens = Instance.new("ModuleScript"),
 	buffComponents = Instance.new("ModuleScript"),
+	getPlanters = Instance.new("ModuleScript"),
+	getFieldsByColor = Instance.new("ModuleScript"),
 	tabs = Instance.new("Folder"),
 	planterTab = Instance.new("ModuleScript"),
 	toysTab = Instance.new("ModuleScript"),
@@ -85,6 +87,12 @@ tbl.getTokens.Parent = tbl.components
 
 tbl.buffComponents.Name = "buffComponents"
 tbl.buffComponents.Parent = tbl.components
+
+tbl.getPlanters.Name = "getPlanters"
+tbl.getPlanters.Parent = tbl.components
+
+tbl.getFieldsByColor.Name = "getFieldsByColor"
+tbl.getFieldsByColor.Parent = tbl.components
 
 tbl.tabs.Name = "tabs"
 tbl.tabs.Parent = tbl.bee_swarm_simulator
@@ -4426,7 +4434,6 @@ modules[tbl.playerMovement] = function()
 	function playerMovement.stop(fireSignal, source)
 		clearConnections()
 		require(script.Parent.signal).killThreads()
-		print(source, 'source')
 	
 		local character = shared.character
 		local humanoid = character and character:FindFirstChild("Humanoid") :: Humanoid
@@ -4468,7 +4475,7 @@ modules[tbl.tween] = function()
 				primaryPart.Velocity = Vector3.new()
 				primaryPart.RotVelocity = Vector3.new()
 				
-				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*350/distance))
+				character:PivotTo(primaryPart.CFrame:Lerp(cframe, runService.Heartbeat:Wait()*75/distance))
 			end
 		end)
 	end
@@ -4674,6 +4681,59 @@ modules[tbl.buffComponents] = function()
 	return module
 end
 
+modules[tbl.getPlanters] = function()
+	local script = tbl.getPlanters
+
+	local planterTypes = require(game.ReplicatedStorage.PlanterTypes)
+	local planters = planterTypes.GetTypes()
+	
+	return function()
+		local t = {}
+	
+		for _, planter in planterTypes.GetTypes() do
+			if not planter.Reusable then continue end
+			local name =  _
+			table.insert(t, name)
+		end
+	
+		return t
+	end
+end
+
+modules[tbl.getFieldsByColor] = function()
+	local script = tbl.getFieldsByColor
+
+	return function()
+		local fields = workspace.FlowerZones:GetChildren()
+		local t = {
+			Red = {},
+			Blue = {},
+			White = {}
+		}
+		for _, field in fields do
+			if field:FindFirstChild("ColorGroup") then
+				table.insert(t[field.ColorGroup.Value], field.Name)
+				continue	
+			end
+			
+			local bestColor
+			local bestMulti
+			
+			for color, f in t do
+				local multi = field[color].Value
+				if not bestColor or multi >= bestMulti then
+					bestMulti = multi
+					bestColor = color
+				end
+			end
+			table.insert(t[bestColor], field.Name)
+		end
+		
+		
+		return t
+	end
+end
+
 modules[tbl.planterTab] = function()
 	local script = tbl.planterTab
 
@@ -4685,6 +4745,7 @@ modules[tbl.planterTab] = function()
 	local planterFeature = require(Features.planters)
 	
 	local uiLibrary = require(components.linoria)
+	local getPlanters = require(components.getPlanters)
 	
 	local planterTypes = require(game.ReplicatedStorage.PlanterTypes)
 	local planters = planterTypes.GetTypes()
@@ -4697,19 +4758,6 @@ modules[tbl.planterTab] = function()
 		end
 	end
 	
-	local materials = {"Oil", "Enzymes", "Red Extract", "Blue Extract", "Super Smoothie", "Purple Potion"}
-	
-	local function getPlanters()
-		local t = {}
-		
-		for _, planter in planterTypes.GetTypes() do
-			if not planter.Reusable then continue end
-			local name = if planter.DisplayName then planter.DisplayName else _.. " Planter"
-			table.insert(t, name)
-		end
-		
-		return t
-	end
 	local planters = getPlanters()
 	
 	local function createCycle(cycle, tab)
@@ -4763,7 +4811,7 @@ modules[tbl.planterTab] = function()
 	
 		mainGroupBox:AddToggle('Auto_Planters', {
 			Text = 'Auto Planters',
-			Callback = planterFeature.toggled
+			Callback = planterFeature.toggle
 		})
 	
 		
@@ -4781,13 +4829,25 @@ modules[tbl.planterTab] = function()
 			Text = "Don't harvest smoking planters",
 			Callback = function() end
 		})
+		settingsBox:AddSlider('planterTimeAuto', {
+			Text = "Harvest Time",
+			Default = 2,
+			Tooltip = "Harvest time for auto mode.",
+			Min = 1,
+			Max = 24,
+			Rounding = 1,
+			Compact = 1,
+			HideMax = false,
+			Callback = planterFeature.changeAutoHarvestTime
+		})
 	
 		mainGroupBox:AddDropdown('Allowed_Planters', {
 			Values = planters,
 			Default = 1, 
 			Text = 'Allowed Planters',
+			Multi = true,
 			Tooltip = "Auto mode is where the field and cycles is done automatically based on settings. Auto is for custom fields and cycles.",
-			Callback = planterFeature.toggle
+			Callback = planterFeature.toggleAllowedPlanters
 		})
 		
 		for i = 1,3 do
@@ -5092,7 +5152,7 @@ modules[tbl.autofarm] = function()
 		preciseQueue = {},
 		allCrosshairs = {},
 		smartAutofarms = {
-			red = true,
+			red = false,
 			blue = false
 		}
 	}
@@ -5223,20 +5283,17 @@ modules[tbl.autofarm] = function()
 		end
 		
 		autofarmTasks.preciseMark:stop(true)
-		print('stop precise marks 2')
 	
 		return false
 	end
 	
 	local function doPrecise()	
 		setthreadidentity(8)
-		print('do precise')
 		local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
 		if preciseValidator(activeCrosshairs) then
 		
 			if not activeCrosshairs then return doPrecise(task.wait()), print('do precise') end
 		else
-			print('stop precise')
 			autofarmTasks.precise:stop(true)
 			return false
 		end
@@ -5260,7 +5317,6 @@ modules[tbl.autofarm] = function()
 	
 		lastPreciseTarget = preciseData
 		targetToken = preciseData.Disk.Part
-		print('walk to precise')
 		playerMovement.newDestination(targetToken.Position)
 		table.remove(autofarmSettings.allCrosshairs, 1)
 		preciseCount += 1
@@ -5273,7 +5329,6 @@ modules[tbl.autofarm] = function()
 			if preciseTargetsDead() then
 				preciseCount = 0
 				if shouldConvertPrecise() and targetToken.Parent then
-					print('destoy wait')
 					return targetToken.Destroying:Wait()
 				end
 				moveToBestMarks()
@@ -5474,7 +5529,7 @@ modules[tbl.autofarm] = function()
 		local old = nil; old = hookfunction(preciseCrosshairsModule.Make, function(...)
 			local params = ...;
 	
-			if params.Player == shared.localPlayer then
+			if params.Player == shared.localPlayer and autofarmSettings.doPrecise then
 				lastCrosshairAdded = time()
 				table.insert(autofarmSettings.preciseQueue, {id = params.ID, ismark = params.Mark, spawnTime = time()})
 				table.insert(autofarmSettings.allCrosshairs, {id = params.ID, ismark = params.Mark})	
@@ -5490,12 +5545,12 @@ modules[tbl.autofarm] = function()
 		autofarm.startAutofarm = startAutofarm
 		autofarm.endAutofarm = endAutofarm
 		
-		task.spawn(function()
-			while task.wait(3) do
-					printtable(autofarmTaskManager.getQueue())
+		--task.spawn(function()
+		--	while task.wait(3) do
+		--			printtable(autofarmTaskManager.getQueue())
 				
-			end
-		end)
+		--	end
+		--end)
 	end
 	
 	function autofarm.changeTarget(v)
@@ -6847,6 +6902,7 @@ modules[tbl.Defeat_Monsters] = function()
 	local mobKiller = require(script.Parent.Parent.mobs)
 	
 	function module.startTask(taskData, questTask)
+		autofarm.setField(Options.Field.Value)
 		questTask:addSecondaryThread(autofarm.startAutofarm, autofarm.endAutofarm)
 		while true do
 			mobKiller.addMob(taskData.MonsterType, taskData.Amount, true)
@@ -6936,18 +6992,28 @@ modules[tbl.planters] = function()
 	local tweenModule = require(components.tween)
 	local keyPress = require(components.keyPress)
 	local buffComponents = require(components.buffComponents)
+	local getPlanters = require(components.getPlanters)
+	local fieldByColor = require(components.getFieldsByColor)()
 	
 	local nectarTypes = require(replicatedStorage.NectarTypes).GetTypes()
+	local planterTypes = require(replicatedStorage.PlanterTypes).GetTypes()
+	local localPlanters = require(replicatedStorage.LocalPlanters)
+	
+	local planterCollectEvent = replicatedStorage.Events.PlanterModelCollect
+	local planterPlaceEvent = replicatedStorage.Events.PlayerActivesCommand
 	
 	local planterTask
+	local lastHarvest = time()
 	
 	local planterConfig = {
 		enabled = false,
 		mode = 'Auto',
 		allowedPlanters = {},
-		nectarData = {}
+		nectarData = {},
+		harvestTimeAuto = 2 * 3600
 	}
-	local nectars = {"Satifying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
+	local nectars = {"Satisfying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
+	local degradingFields = {}
 	
 	local function getNectarTimes()
 		local t = {}
@@ -6960,53 +7026,296 @@ modules[tbl.planters] = function()
 	local function sortNectars(a, b)
 		local nectar1 = planterConfig.nectarData[a]
 		local nectar2 = planterConfig.nectarData[b]
+		local nectarTimes = getNectarTimes()
+	
+		local nectar1AtMin = nectarTimes[a] >= nectar1.minHour
+		local nectar2AtMin = nectarTimes[b] >= nectar2.minHour
+	
+		if nectar1AtMin ~= nectar2AtMin then
+			return not nectar1AtMin
+		end
+	
+		return nectar1.priority < nectar2.priority
+	end
+	
+	
+	local function nectarsLeveledOut() --basically all nectars are at ther min level or they are close to each other (ex: sat: 15hr, mot: 14hr, comf:15hr) all close to eachother!
+		local nectarTimes = getNectarTimes()
 		
-		return nectar1.priority > nectar2.priority
+		for _, nectar in nectars do
+			local lastNectar = nectars[_-1] or nectars[5]
+			
+			local targetNectarTime = nectarTimes[nectar]
+			local nextNectarTime = nectarTimes[lastNectar]
+			
+			local hoursApart = math.abs(targetNectarTime - nextNectarTime)
+			local atMin = targetNectarTime >= planterConfig.nectarData[nectar].minHour
+	
+			if hoursApart > 2 and not atMin then
+				return false
+			end
+		end
+		return true
+	end
+	
+	local function anectarBelowMin()
+		local nectarTimes = getNectarTimes()
+		for _, nectar in nectars do
+	
+			local targetNectarTime = nectarTimes[nectar]
+	
+			local atMin = targetNectarTime >= planterConfig.nectarData[nectar].minHour
+	
+			if not atMin then
+				return true
+			end
+		end
+		return false
+	end
+	
+	local function getPlanterCountForNectar(currentPlanterCount, priority, time, minTime)
+		if nectarsLeveledOut() then
+			return 1
+		end
+	
+		if time >= minTime then
+			return (currentPlanterCount < 2) and 0 or 1
+		end
+	
+		local timeRatio = time / minTime
+	
+		if priority <= 2 then
+			if timeRatio <= 0.25 then return 3 end
+			if timeRatio <= 0.5 then return 3 end
+			return 2
+		end
+	
+		if priority >= 3 then
+			if timeRatio <= 0.25 then return 2 end
+			if timeRatio <= 0.5 then return 2 end
+			return 1
+		end
+	
+		return (priority <= 2) and 2 or 1
+	end
+	
+	
+	local function fieldToColor(field)
+		for color, fields in fieldByColor do
+			if table.find(fields, field) then
+				return color
+			end
+		end
+	end
+		
+	
+	local function fieldToPlanter(field, chosenPlanters)
+		for _, planter in getPlanters() do
+			if not planterConfig.allowedPlanters[planter] or table.find(chosenPlanters, planter) then
+				continue
+			end
+			
+			local planterGrowthData = planterTypes[planter].GrowthMultipliers
+			if planterGrowthData.Zones and table.find(planterGrowthData.Zones, field) then
+				return planter
+			end
+			if planterGrowthData.Colors then
+				for color, multi in planterGrowthData.Colors do
+					local fieldColor = fieldToColor(field)
+					
+					if multi > 1 and fieldColor == color then
+						return planter
+					end
+				end
+			end
+		end
+		
+		--didnt find a planter? lets return a random one!
+		
+		for planter, value in planterConfig.allowedPlanters do
+			if value and not table.find(chosenPlanters, planter) then
+				return planter
+			end
+		end
+	end
+	
+	local function nectarToFields(nectar)
+		for nectarType, data in nectarTypes do
+			if string.find(nectar, nectarType) then
+				return data.Fields
+			end
+		end
+	end
+	
+	local function getFieldAndPlanter(nectar, chosenFields, chosenPlanters, ignoreDegrade)
+		local possibleFields = nectarToFields(nectar)
+		
+		for _, field in possibleFields do
+			if table.find(chosenFields, field) or degradingFields[field] and not ignoreDegrade then
+				continue
+			end
+			local planter = fieldToPlanter(field, chosenPlanters)
+			if planter then
+				return field, planter
+			end
+		end
+		--didnt find any redoing and ignoring degrade
+		return getFieldAndPlanter(nectar, chosenFields, chosenPlanters, true)
 	end
 	
 	local function getPlanters()
-		table.sort(sortNectars)
+		table.sort(nectars, sortNectars)
 		local nectarTimes = getNectarTimes()
+		local planters = {}
+		
+		local chosenFields = {}
+		local chosenPlanters ={}
+		
+		for _, nectar in nectars do
+			local nectarData = planterConfig.nectarData[nectar]
+			if not nectarData.enabled then continue end
+			
+			local time = nectarTimes[nectar]
+			local planterCount = getPlanterCountForNectar(#planters, _, time, nectarData.minHour)
+		
+			if planterCount > 0 then
+				for i = 1, planterCount do
+					local field, planter = getFieldAndPlanter(nectar, chosenFields, chosenPlanters)	
+				
+					table.insert(chosenFields, field)
+					table.insert(chosenPlanters, planter)
+					
+					table.insert(planters, {
+						field = field,
+						planter = planter
+					})
+					
+					degradingFields[field] = 1
+					
+					if #planters == 3 then
+						return planters
+					end
+				end
+			end
+		end
+		return planters
+	end
+	
+	local function lootPlanter()
+		local character = shared.character
+		local tokens = require(components.getTokens)(character.PrimaryPart.Position, 35)
+		local playerMovement = require(components.playerMovement)
+		
+		for _, token in tokens do
+			if token.Parent then
+				playerMovement.newDestination(token.Position)
+				playerMovement.movementFinished:wait()
+			end
+		end
+	end
+	
+	local function harvestAll()
+		local loadPlanterFunc = localPlanters.LoadPlanter
+		local PlanterTable = debug.getupvalues(loadPlanterFunc)[4]
+	
+		for k, v in (PlanterTable) do
+			if v.PotModel and v.IsMine then
+				local Position = v.Pos
+				local CFrame = CFrame.new(Position)
+				local planter_string = tostring(v.PotModel)
+				
+				tweenModule.tween(CFrame)
+				tweenModule.tweenComplete:wait()
+				
+				planterCollectEvent:FireServer(v.ActorID)
+				task.wait(2)
+				lootPlanter()
+			end
+		end
+	end
+	
+	local function placePlanterInField(planter, field)
+		local fieldCFrame = workspace.FlowerZones[field].CFrame
+		tweenModule.tween(fieldCFrame)
+		tweenModule.tweenComplete:wait()
+		task.wait(1)
+		planterPlaceEvent:FireServer({["Name"] = planter})
 	end
 	
 	local function doAutoPlanters()
-		
+		local planters = getPlanters()
+		printtable(planters)
+		for _, data in planters do
+			placePlanterInField(data.planter.." Planter", data.field)
+			print(data.planter, data.field)
+			task.wait(.5)
+		end
+		for field, cycle in degradingFields do
+			if cycle+1 > 3 then
+				degradingFields[field] = nil
+				continue
+			end
+			degradingFields[field] += 1
+		end
 	end
 	
 	local function doManualPlanters()
-		
+	
+	
 	end
 	
 	local function startPlanters()
+		harvestAll()
 		
+		doAutoPlanters()
+		
+		lastHarvest = time()
+		
+		planterTask:stop(true)
 	end
 	
-	function planter.changeMaterials()
-		
+	function planter.changeAutoHarvestTime(value)
+		planterConfig.harvestTimeAuto = value * 3600
 	end
 	
 	function planter.toggle(value)
 		planterConfig.enabled = value
+		if value then
+			planterTask:addToQueue()
+		end
 	end
 	
 	function planter.toggleAllowedPlanters(value)
 		planterConfig.allowedPlanters = value
+		
 	end
 	
 	local function loop()
 		while task.wait(1) do
-			
+			if (time() - lastHarvest) >= planterConfig.harvestTimeAuto * 3600 and planterConfig.enabled then
+				planterTask:addToQueue()
+			end
 		end
 	end
 	
 	function planter.init()
-		for nectar, data in nectarTypes do
+		for _, nectar in nectars do
 			planterConfig.nectarData[nectar] = {
-				priority = math.random(5,10),
-				enabled = true
+				priority = math.random(1,5),
+				enabled = true,
+				minHour = 18 * 3600,
 			}
 		end
-		
+		--local nectars = {"Satisfying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
+	
+		--temporily til i add fuckinng ui lol
+		planterConfig.nectarData['Invigorating Nectar'].enabled = false
+		planterConfig.nectarData['Comforting Nectar'].priority = 1
+		planterConfig.nectarData['Satisfying Nectar'].priority = 2
+		planterConfig.nectarData['Refreshing Nectar'].priority = 3
+		planterConfig.nectarData['Motivating Nectar'].priority = 1
+	
+		printtable(planterConfig.nectarData)
 		
 		planterTask = taskManager.new("planter", 9, startPlanters)	
 		task.spawn(loop)	
