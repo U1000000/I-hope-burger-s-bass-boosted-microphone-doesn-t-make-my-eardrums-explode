@@ -7009,6 +7009,8 @@ modules[tbl.planters] = function()
 	local planterCollectEvent = replicatedStorage.Events.PlanterModelCollect
 	local planterPlaceEvent = replicatedStorage.Events.PlayerActivesCommand
 	
+	local blockedFields = {"Ant Field", 'White Brick Field', 'Red Brick Field', 'Blue Brick Field', 'Hub Field'}
+	
 	local planterTask
 	local lastHarvest = time()
 	
@@ -7158,7 +7160,7 @@ modules[tbl.planters] = function()
 		local possibleFields = nectarToFields(nectar)
 		
 		for _, field in possibleFields do
-			if table.find(chosenFields, field) or degradingFields[field] and not ignoreDegrade then
+			if table.find(chosenFields, field) or table.find(blockedFields, field) or degradingFields[field] and not ignoreDegrade then
 				continue
 			end
 			local planter = fieldToPlanter(field, chosenPlanters)
