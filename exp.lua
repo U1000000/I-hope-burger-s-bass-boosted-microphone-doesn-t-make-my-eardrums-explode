@@ -5018,7 +5018,13 @@ modules[tbl.autofarmTab] = function()
 			Text = 'Convert Hive Balloon',
 			Callback = convert.toggleBalloon
 		})
-	
+		
+		
+		convertSettingsBox:AddToggle('crosshairConvert', {
+			Text = 'Use crosshairs to convert',
+			Callback = Autofarm.togglePreciseConvert,
+			Tooltip = 'REQUIRES RED AUTOFARM TO BE ENABLED'
+		})
 		
 		convertSettingsBox:AddSlider('convertTimeSlider', {
 			Text = "Convert Time",
@@ -5095,6 +5101,18 @@ modules[tbl.autofarmTab] = function()
 			Callback = function() end
 		})
 	
+	
+		settingsBox:AddToggle('redAutofarm', {
+			Text = 'Smart Red Autofarm',
+			Callback = Autofarm.toggleRedAutofarm
+		})
+		
+	
+		settingsBox:AddToggle('blueAutofarm', {
+			Text = 'Smart Blue Autofarm',
+			Callback = Autofarm.toggleBlueAutofarm
+		})
+	
 		settingsBox:AddSlider('walkspeedSlider', {
 			Text = "Autofarm Speed",
 			Default = 50,
@@ -5105,6 +5123,19 @@ modules[tbl.autofarmTab] = function()
 			HideMax = false,
 			
 		})
+		
+		settingsBox:AddSlider('preciseConvertSlider', {
+			Text = "Backpack % for crosshair",
+			Default = 75,
+			Min = 1,
+			Max = 100,
+			Rounding = 1,
+			Compact = 1,
+			Tooltip = `backpack percentage to stand on crosshairs (REQUIRES RED AUTOFARM AND "Use crosshairs to convert" TO BE ENABLED)`, 
+			HideMax = false,
+			Callback = Autofarm.togglePreciseConvertPercent
+		})
+		
 		
 		
 		--pushroom side
@@ -5185,6 +5216,8 @@ modules[tbl.autofarm] = function()
 		farmDupedTokens = false,
 		flames = false,
 		collectBubbles = false,
+		useCrosshairToConvert = false,
+		crosshairConvertPercent = 75,
 		tokenDistance = DEFAULT_TOKEN_DISTANCE,
 		task = {
 			collectingTokens = true,
@@ -5204,7 +5237,11 @@ modules[tbl.autofarm] = function()
 	local function shouldConvertPrecise()
 		local fullPercent = backpack.Pollen.Value / backpack.Capacity.Value
 		
-		return fullPercent >= .7
+		if not autofarmSettings.useCrosshairToConvert then
+			return false
+		end
+		
+		return fullPercent >= autofarmSettings.crosshairConvertPercent / 100
 	end
 	
 	local function preciseTargetsDead()
@@ -5540,10 +5577,6 @@ modules[tbl.autofarm] = function()
 			local humanoid = shared.character.Humanoid.WalkSpeed
 			if not targetToken or not targetToken.Parent or targetToken.Transparency == 1 or distance and distance < math.max(humanoid/12, 3.25) then
 				if callback() == false then return end
-				local t = autofarmTaskManager.getTask() 
-				if t then
-					print(t.name)
-				end
 			end
 			task.wait()
 		end
@@ -5555,6 +5588,22 @@ modules[tbl.autofarm] = function()
 	
 	local function startToken()
 		startLoop(nextToken)
+	end
+	
+	function autofarm.toggleRedAutofarm(value)
+		autofarmSettings.smartAutofarms.red = value
+	end
+	
+	function autofarm.toggleBlueAutofarm(value)
+		autofarmSettings.smartAutofarms.blue = value
+	end
+	
+	function autofarm.togglePreciseConvert(value)
+		autofarmSettings.useCrosshairToConvert = value
+	end
+	
+	function autofarm.togglePreciseConvertPercent(value)
+		autofarmSettings.crosshairConvertPercent = value
 	end
 	
 	function autofarm.init()
@@ -6698,7 +6747,7 @@ modules[tbl.mobs] = function()
 		
 		task.wait(1)
 		local pos = shared.character and shared.character.PrimaryPart
-		local tokens = tokens(pos.Position, 60)
+		local tokens = tokens(pos.Position, 45)
 		
 		for _, token in tokens do
 			if not token.Parent then continue end
@@ -6708,6 +6757,7 @@ modules[tbl.mobs] = function()
 	end
 	
 	local function startGettingMobs()
+		print('start mob')
 		for _, mob in mobsToKill do
 			table.remove(mobsToKill, _)
 			killMob(mob)
@@ -7332,19 +7382,24 @@ modules[tbl.planters] = function()
 	
 	local function doAutoPlanters()
 		local planters = getPlanters()
+		
+		for field, cycle in degradingFields do
+			if cycle+1 > 3 then
+				degradingFields[field] = nil
+				print('removed', field)
+				continue
+			end
+			degradingFields[field] += 1
+		end
+		
+		
 		printtable(planters)
 		for _, data in planters do
 			placePlanterInField(data.planter.." Planter", data.field)
 			print(data.planter, data.field)
 			task.wait(.5)
 		end
-		for field, cycle in degradingFields do
-			if cycle+1 > 3 then
-				degradingFields[field] = nil
-				continue
-			end
-			degradingFields[field] += 1
-		end
+		
 	end
 	
 	local function doManualPlanters()
@@ -7439,8 +7494,10 @@ task.spawn(function()
 	})
 	
 	local function loadTabs()
-		for _, module in tabs:GetChildren() do
-			require(module).init(Window)
+		local tabOrder = {"autofarm", "toys", "quest","planter"}
+		for _, module in tabOrder do
+			local m = tabs[module..'Tab']
+			require(m).init(Window)
 		end
 	end
 	
@@ -7510,6 +7567,24 @@ task.spawn(function()
 	
 	loadFeatures()
 	loadTabs()
+	
+	
+	if workspace:FindFirstChild("FieldDecos") then
+		workspace.FieldDecos:Destroy()
+	end
+	
+	if workspace:FindFirstChild("Decorations") and workspace.Decorations:FindFirstChild("Misc") then
+		for i,v in pairs(workspace:WaitForChild("Decorations"):WaitForChild("Misc"):GetDescendants()) do if v.Name == "Mushroom" then v:Destroy() end end
+		for i,v in pairs(workspace.Decorations["Diamond Mask Hall"]:GetChildren()) do if v:FindFirstChild("GateScript") then v:Destroy() end end
+	
+		if workspace.Decorations:FindFirstChild("JumpGames") and workspace.Decorations.JumpGames:FindFirstChild("Mushroom") then
+			workspace.Decorations.JumpGames.Mushroom:Destroy()
+		end
+	
+		if workspace:FindFirstChild("Decorations") and workspace.Decorations:FindFirstChild("30BeeZone") and workspace.Decorations["30BeeZone"]:FindFirstChild("Pit") then workspace.Decorations["30BeeZone"].Pit:Destroy() end
+	end
+	
+	
 	
 	local vu = cloneref(game:GetService("VirtualUser"))
 	shared.localPlayer.Idled:Connect(function()
