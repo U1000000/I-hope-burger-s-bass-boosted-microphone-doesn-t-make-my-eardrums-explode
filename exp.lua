@@ -4693,16 +4693,25 @@ modules[tbl.getPlanters] = function()
 	local planterTypes = require(game.ReplicatedStorage.PlanterTypes)
 	local planters = planterTypes.GetTypes()
 	
+	local planterNames = {
+		"Plenty",
+		"Petal",
+		"Hydroponic",
+		"Heat-Treated",
+		"Pesticide",
+		"Tacky",
+		"Blue Clay",
+		"Red Clay",
+		"Candy",
+		"Plastic",
+		"Festive",
+		"Ticket",
+		"Paper"
+	}
+	
+	
 	return function()
-		local t = {}
-	
-		for _, planter in planterTypes.GetTypes() do
-			if not planter.Reusable then continue end
-			local name =  _
-			table.insert(t, name)
-		end
-	
-		return t
+		return planterNames
 	end
 end
 
@@ -4977,7 +4986,9 @@ modules[tbl.autofarmTab] = function()
 	local fields = {}
 	
 	local function getFields()
+		local blockedFields = {"Ant Field", 'White Brick Field', 'Red Brick Field', 'Blue Brick Field', 'Hub Field'}
 		for _, field in workspace.FlowerZones:GetChildren() do
+			if table.find(blockedFields, field.Name) then continue end
 			table.insert(fields, field.Name)
 		end
 	end
@@ -7130,6 +7141,7 @@ modules[tbl.planters] = function()
 	local buffComponents = require(components.buffComponents)
 	local getPlanters = require(components.getPlanters)
 	local fieldByColor = require(components.getFieldsByColor)()
+	local autofarmHelpers = require(script.Parent.autofarm.helpers)
 	
 	local nectarTypes = require(replicatedStorage.NectarTypes).GetTypes()
 	local planterTypes = require(replicatedStorage.PlanterTypes).GetTypes()
@@ -7161,6 +7173,29 @@ modules[tbl.planters] = function()
 		return t
 	end
 	
+	local function nectarsLeveledOut() --basically all nectars are at ther min level or they are close to each other (ex: sat: 15hr, mot: 14hr, comf:15hr) all close to eachother!
+		local nectarTimes = getNectarTimes()
+	
+		for _, nectar in nectars do
+			local nectarData = planterConfig.nectarData[nectar]
+			if not nectarData.enabled then
+				continue
+			end
+	
+			local lastNectar = nectars[_-1] or nectars[5]
+			local targetNectarTime = nectarTimes[nectar]
+			local nextNectarTime = nectarTimes[lastNectar]
+	
+			local hoursApart = math.abs(targetNectarTime - nextNectarTime)
+			local atMin = targetNectarTime >= nectarData.minHour
+	
+			if hoursApart > 2 and not atMin then
+				return false
+			end
+		end
+		return true
+	end
+	
 	local function sortNectars(a, b)
 		local nectar1 = planterConfig.nectarData[a]
 		local nectar2 = planterConfig.nectarData[b]
@@ -7172,28 +7207,12 @@ modules[tbl.planters] = function()
 		if nectar1AtMin ~= nectar2AtMin then
 			return not nectar1AtMin
 		end
+		
+		if nectarsLeveledOut() then
+			return nectarTimes[a] < nectarTimes[b]
+		end
 	
 		return nectar1.priority < nectar2.priority
-	end
-	
-	
-	local function nectarsLeveledOut() --basically all nectars are at ther min level or they are close to each other (ex: sat: 15hr, mot: 14hr, comf:15hr) all close to eachother!
-		local nectarTimes = getNectarTimes()
-		
-		for _, nectar in nectars do
-			local lastNectar = nectars[_-1] or nectars[5]
-			
-			local targetNectarTime = nectarTimes[nectar]
-			local nextNectarTime = nectarTimes[lastNectar]
-			
-			local hoursApart = math.abs(targetNectarTime - nextNectarTime)
-			local atMin = targetNectarTime >= planterConfig.nectarData[nectar].minHour
-	
-			if hoursApart > 2 and not atMin then
-				return false
-			end
-		end
-		return true
 	end
 	
 	local function anectarBelowMin()
@@ -7290,15 +7309,18 @@ modules[tbl.planters] = function()
 		
 		for _, field in possibleFields do
 			if table.find(chosenFields, field) or table.find(blockedFields, field) or degradingFields[field] and not ignoreDegrade then
+				print(table.find(chosenFields, field), table.find(blockedFields, field), degradingFields[field], field, ignoreDegrade , 'skip info')
 				continue
 			end
 			local planter = fieldToPlanter(field, chosenPlanters)
+			print(planter, field)
 			if planter then
 				return field, planter
 			end
 		end
 		--didnt find any redoing and ignoring degrade
-		return getFieldAndPlanter(nectar, chosenFields, chosenPlanters, true)
+		print('ignoring degrade')
+		return getFieldAndPlanter(nectar, chosenFields, chosenPlanters, false)
 	end
 	
 	local function getPlanters()
@@ -7329,6 +7351,7 @@ modules[tbl.planters] = function()
 					})
 					
 					degradingFields[field] = 1
+					printtable(degradingFields)
 					
 					if #planters == 3 then
 						return planters
@@ -7361,6 +7384,11 @@ modules[tbl.planters] = function()
 				local Position = v.Pos
 				local CFrame = CFrame.new(Position)
 				local planter_string = tostring(v.PotModel)
+	
+				local field = autofarmHelpers.posToField(Position) 
+				if field and not degradingFields[field.Instance.Name] then
+					degradingFields[field.Instance.Name] = 1
+				end
 				
 				tweenModule.tween(CFrame)
 				tweenModule.tweenComplete:wait()
@@ -7512,8 +7540,8 @@ task.spawn(function()
 			return
 		end
 		local speed = Options.walkspeedSlider.Value
-		local humanoid = shared.character.Humanoid
-		if humanoid.WalkSpeed == speed then
+		local humanoid = shared.character:FindFirstChild("Humanoid")
+		if not humanoid or humanoid.WalkSpeed == speed then
 			return
 		end
 		humanoid.WalkSpeed = speed
