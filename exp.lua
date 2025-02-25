@@ -7480,11 +7480,11 @@ modules[tbl.planters] = function()
 		--local nectars = {"Satisfying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
 	
 		--temporily til i add fuckinng ui lol
-		planterConfig.nectarData['Invigorating Nectar'].enabled = false
-		planterConfig.nectarData['Comforting Nectar'].priority = 1
+		planterConfig.nectarData['Invigorating Nectar'].priority = 1
+		planterConfig.nectarData['Comforting Nectar'].priority = 5
 		planterConfig.nectarData['Satisfying Nectar'].priority = 2
-		planterConfig.nectarData['Refreshing Nectar'].priority = 3
-		planterConfig.nectarData['Motivating Nectar'].priority = 1
+		planterConfig.nectarData['Refreshing Nectar'].priority = 1
+		planterConfig.nectarData['Motivating Nectar'].priority = 3
 	
 		printtable(planterConfig.nectarData)
 		
