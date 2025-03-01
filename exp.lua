@@ -6021,7 +6021,6 @@ modules[tbl.precisePathfind] = function()
 	local module = {}
 	
 	function module.addCrosshairHitboxes(crosshairs)
-		print('making hitboxes')
 		for _, params in crosshairs do
 			local id = params.id
 			local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
@@ -6525,6 +6524,7 @@ modules[tbl.convert] = function()
 			distance = player:DistanceFromCharacter(convertPosition.Position)
 			if Pollen.Value == 0 then
 				if not convertBalloon or not gethiveballoon() then
+					lastConvert = time()
 					task.wait(4)
 					print('convert stop')
 					return convertTask:stop(true)
