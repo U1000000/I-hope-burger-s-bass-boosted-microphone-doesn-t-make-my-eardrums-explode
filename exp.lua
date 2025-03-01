@@ -6536,7 +6536,9 @@ modules[tbl.convert] = function()
 				tweenModule.tween(convertPosition)
 				tweenModule.tweenComplete:wait()
 				task.wait(.5)
-				keyPress.pressE()
+				if activateButton.Text ~= "Stop Making Honey " then
+					keyPress.pressE()
+				end
 			end
 		end
 	end
