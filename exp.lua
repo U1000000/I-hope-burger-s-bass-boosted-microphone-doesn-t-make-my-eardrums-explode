@@ -6521,7 +6521,8 @@ modules[tbl.convert] = function()
 		local convertPosition = SpawnPos.Value + Vector3.new(0,0,9)
 		local distance = player:DistanceFromCharacter(convertPosition.Position)
 	
-		while task.wait(1) or distance >= 4 do
+		while task.wait(1) or distance >= 3 do
+			distance = player:DistanceFromCharacter(convertPosition.Position)
 			if Pollen.Value == 0 then
 				if not convertBalloon or not gethiveballoon() then
 					task.wait(4)
@@ -6530,7 +6531,7 @@ modules[tbl.convert] = function()
 				end
 			end
 			
-			if activateButton.Text ~= "Stop Making Honey" or distance >= 4 then
+			if activateButton.Text ~= "Stop Making Honey" or distance >= 3 then
 	
 				tweenModule.tween(convertPosition)
 				tweenModule.tweenComplete:wait()
