@@ -241,6 +241,10 @@ modules[tbl.taskSystem] = function()
 		return true 
 	end
 	
+	function taskSystem.getQueue()
+		return queue
+	end
+	
 	function taskSystem:stop(taskEnded, forceCancel)
 	--	task.spawn(function() -- new thread cus of thread identities
 			if not self.running then
@@ -5106,6 +5110,8 @@ modules[tbl.autofarmTab] = function()
 				if runningtask then
 					printtable(runningtask)
 				end
+				print('----------------------------')
+				printtable(taskSystem.getQueue())
 			end,
 			DoubleClick = false,
 			Tooltip = 'gake'
@@ -6505,9 +6511,13 @@ modules[tbl.convert] = function()
 			return
 		end
 		lastBagFull = time()	
+		if convertToggled and not waitToConvert then
+			convertTask:addToQueue()
+		end
 	end
 	
 	local function convertBag()
+		print('convert start')
 		local convertPosition = SpawnPos.Value + Vector3.new(0,0,9)
 		local distance = player:DistanceFromCharacter(convertPosition.Position)
 	
@@ -6515,12 +6525,12 @@ modules[tbl.convert] = function()
 			if Pollen.Value == 0 then
 				if not convertBalloon or not gethiveballoon() then
 					task.wait(4)
-					
+					print('convert stop')
 					return convertTask:stop(true)
 				end
 			end
 			
-			if activateButton.Text ~= "Stop Making Honey" then
+			if activateButton.Text ~= "Stop Making Honey" or distance >= 4 then
 	
 				tweenModule.tween(convertPosition)
 				tweenModule.tweenComplete:wait()
@@ -6566,6 +6576,7 @@ modules[tbl.convert] = function()
 			if waitToConvert and (time() - lastBagFull) >= waitToConvertTime and (Pollen.Value >= Capacity.Value) then
 				convertTask:addToQueue()
 			end
+			
 		end
 	end
 	
