@@ -6531,7 +6531,7 @@ modules[tbl.convert] = function()
 				end
 			end
 			
-			if activateButton.Text ~= "Stop Making Honey" or distance >= 5 then
+			if activateButton.Text ~= "Stop Making Honey" or distance >= 6 then
 				print(activateButton.Text, distance)
 				tweenModule.tween(convertPosition)
 				tweenModule.tweenComplete:wait()
