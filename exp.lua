@@ -5428,7 +5428,7 @@ modules[tbl.autofarm] = function()
 		local activeCrosshairs = debug.getupvalue(preciseCrosshairsModule.InitBeams, 1)
 		if preciseValidator(activeCrosshairs) then
 		
-			if not activeCrosshairs then return doPrecise(task.wait()), print('do precise') end
+			if not activeCrosshairs then return doPrecise(task.wait()) end
 		else
 			autofarmTasks.precise:stop(true)
 			return false
@@ -6051,7 +6051,7 @@ modules[tbl.precisePathfind] = function()
 			Part.Size = child.Size * 1.2
 			Part.Size += Vector3.new(0,5,0)
 			Part.CanCollide = false
-			Part.Transparency = 0
+			Part.Transparency = 1
 			Part.Anchored = true
 			Part.Position = child.Position
 			Part.Parent = child
@@ -6521,7 +6521,7 @@ modules[tbl.convert] = function()
 		local convertPosition = SpawnPos.Value + Vector3.new(0,0,9)
 		local distance = player:DistanceFromCharacter(convertPosition.Position)
 	
-		while task.wait(1) or distance >= 3 do
+		while task.wait(1) do
 			distance = player:DistanceFromCharacter(convertPosition.Position)
 			if Pollen.Value == 0 then
 				if not convertBalloon or not gethiveballoon() then
@@ -6531,8 +6531,8 @@ modules[tbl.convert] = function()
 				end
 			end
 			
-			if activateButton.Text ~= "Stop Making Honey" or distance >= 3 then
-	
+			if activateButton.Text ~= "Stop Making Honey" or distance >= 5 then
+				print(activateButton.Text, distance)
 				tweenModule.tween(convertPosition)
 				tweenModule.tweenComplete:wait()
 				task.wait(.5)
