@@ -4766,6 +4766,7 @@ modules[tbl.planterTab] = function()
 	local planters = planterTypes.GetTypes()
 	
 	local fields = {}
+	local nectars = {"Satisfying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
 	
 	local function getFields()
 		for _, field in workspace.FlowerZones:GetChildren() do
@@ -4823,6 +4824,7 @@ modules[tbl.planterTab] = function()
 		local mainGroupBox = tab:AddLeftGroupbox('Main')
 		--local autofarmTogglesBox = tab:AddLeftGroupbox('Toggles')
 		local settingsBox = tab:AddLeftGroupbox('Settings')
+		local autoSettingsBox = tab:AddLeftGroupbox('Auto Settings')
 	
 		mainGroupBox:AddToggle('Auto_Planters', {
 			Text = 'Auto Planters',
@@ -4867,6 +4869,27 @@ modules[tbl.planterTab] = function()
 		
 		for i = 1,3 do
 			createCycle(i, tab)
+		end
+		
+		for _, nectar in nectars do
+			autoSettingsBox:AddToggle(nectar.."autoenabled", {
+				Text = nectar,
+				Callback = function(value)
+					planterFeature.toggleNectarEnable(nectar, value)
+				end
+			})
+			autoSettingsBox:AddSlider(nectar..'priority', {
+				Text = "Priority",
+				Default = 1,
+				Min = 1,
+				Max = 5,
+				Rounding = 1,
+				Compact = 1,
+				HideMax = false,
+				Callback = function(value)
+					planterFeature.toggleNectarPrioiry(nectar, value)
+				end,
+			})
 		end
 	end
 	
@@ -5030,6 +5053,11 @@ modules[tbl.autofarmTab] = function()
 			Callback = convert.toggleBalloon
 		})
 		
+		convertSettingsBox:AddToggle('waitConvert', {
+			Text = 'Wait to Convert',
+			Callback = convert.toggleWait,
+			Tooltip = "Wait x amount of seconds to convert after bag is full?"
+		})
 		
 		convertSettingsBox:AddToggle('crosshairConvert', {
 			Text = 'Use crosshairs to convert',
@@ -5047,6 +5075,19 @@ modules[tbl.autofarmTab] = function()
 			Compact = 1,
 			HideMax = false,
 			Callback = convert.toggleTime
+		})
+		
+	
+		convertSettingsBox:AddSlider('convertWaitSlider', {
+			Text = "Wait to convert time",
+			Default = 20,
+			Min = 1,
+			Max = 60,
+			Tooltip = "Wait to convert (in seconds)",
+			Rounding = 1,
+			Compact = 1,
+			HideMax = false,
+			Callback = convert.toggleWaitTime
 		})
 		
 		mainGroupBox:AddButton({
@@ -5467,7 +5508,7 @@ modules[tbl.autofarm] = function()
 		table.remove(tokens, 1)
 	
 		if not autofarmHelpers.canGetItem(target, autofarmSettings.field, autofarmSettings.tokenDistance, autofarmSettings.puffs) then
-			return nextToken() -- this causes the freeze sometimes
+			return nextToken(task.wait()) -- this causes the freeze sometimes
 		end
 		targetToken = target
 		
@@ -6433,11 +6474,16 @@ modules[tbl.convert] = function()
 	
 	local convertTask
 	local convertToggled
+	
 	local convertWhenTime = false
+	local waitToConvert = false
+	
 	local convertBalloon
+	local waitToConvertTime = 20
 	
 	local convertTime = 20 * 60
 	local lastConvert = time()
+	local lastBagFull = time()
 	
 	local function gethiveballoon()
 		for _,balloon in (game.Workspace.Balloons.HiveBalloons:GetChildren()) do
@@ -6450,23 +6496,15 @@ modules[tbl.convert] = function()
 		return false
 	end
 	
+	local function doConvert()
+		
+	end
+	
 	local function checkConvert()
-		if not convertToggled then
+		if not convertToggled or Pollen.Value < Capacity.Value or convertTask.running then
 			return
 		end
-		if Pollen.Value >= Capacity.Value then
-			convertTask:addToQueue()
-		elseif convertTask.running and Pollen.Value == 0 then
-			if convertBalloon then
-				while gethiveballoon() do
-					task.wait(1)
-				end
-			end
-			
-			task.wait(4) --will make this automatic based on when the convert trails disappear
-			lastConvert = time()
-			convertTask:stop(true, true)
-		end
+		lastBagFull = time()	
 	end
 	
 	local function convertBag()
@@ -6474,6 +6512,14 @@ modules[tbl.convert] = function()
 		local distance = player:DistanceFromCharacter(convertPosition.Position)
 	
 		while task.wait(1) or distance >= 4 do
+			if Pollen.Value == 0 then
+				if not convertBalloon or not gethiveballoon() then
+					task.wait(4)
+					
+					return convertTask:stop(true)
+				end
+			end
+			
 			if activateButton.Text ~= "Stop Making Honey" then
 	
 				tweenModule.tween(convertPosition)
@@ -6504,9 +6550,20 @@ modules[tbl.convert] = function()
 		convertBalloon = value
 	end
 	
+	function convert.toggleWait(value)
+		waitToConvert = value
+	end
+	
+	function convert.toggleWaitTime(value)
+		waitToConvertTime = value
+	end
+	
 	local function loop()
 		while task.wait(1) do
 			if convertWhenTime and (time() - lastConvert) >= convertTime then
+				convertTask:addToQueue()
+			end
+			if waitToConvert and (time() - lastBagFull) >= waitToConvertTime and (Pollen.Value >= Capacity.Value) then
 				convertTask:addToQueue()
 			end
 		end
@@ -7230,8 +7287,26 @@ modules[tbl.planters] = function()
 		return false
 	end
 	
+	local function getNectarEnabledCount()
+		local x = 0
+		for _, nectardata in planterConfig.nectarData do
+			if nectardata.enabled then
+				x += 1
+			end
+		end
+		return x
+	end
+	
 	local function getPlanterCountForNectar(currentPlanterCount, priority, time, minTime)
+		local nectarEnabledCount = getNectarEnabledCount()
+		if nectarEnabledCount == 1 then
+			return 3
+		end
+		
 		if nectarsLeveledOut() then
+			if nectarEnabledCount <= 2 then
+				return 2 
+			end
 			return 1
 		end
 	
@@ -7320,7 +7395,7 @@ modules[tbl.planters] = function()
 		end
 		--didnt find any redoing and ignoring degrade
 		print('ignoring degrade')
-		return getFieldAndPlanter(nectar, chosenFields, chosenPlanters, false)
+		return getFieldAndPlanter(nectar, chosenFields, chosenPlanters, true)
 	end
 	
 	local function getPlanters()
@@ -7469,22 +7544,21 @@ modules[tbl.planters] = function()
 		end
 	end
 	
+	function planter.toggleNectarEnable(nectar, value)
+		planterConfig.nectarData[nectar].enabled =value
+	end
+	function planter.toggleNectarPrioiry(nectar, value)
+		planterConfig.nectarData[nectar].priority = value
+	end
+	
 	function planter.init()
 		for _, nectar in nectars do
 			planterConfig.nectarData[nectar] = {
-				priority = math.random(1,5),
-				enabled = true,
+				priority = 1,
+				enabled = false,
 				minHour = 18 * 3600,
 			}
 		end
-		--local nectars = {"Satisfying Nectar", "Motivating Nectar", "Refreshing Nectar", "Invigorating Nectar", "Comforting Nectar"}
-	
-		--temporily til i add fuckinng ui lol
-		planterConfig.nectarData['Invigorating Nectar'].priority = 1
-		planterConfig.nectarData['Comforting Nectar'].priority = 5
-		planterConfig.nectarData['Satisfying Nectar'].priority = 2
-		planterConfig.nectarData['Refreshing Nectar'].priority = 1
-		planterConfig.nectarData['Motivating Nectar'].priority = 3
 	
 		printtable(planterConfig.nectarData)
 		
@@ -7621,4 +7695,21 @@ task.spawn(function()
 		vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 	end)
 	shared.character:WaitForChild("Humanoid"):GetPropertyChangedSignal("WalkSpeed"):Connect(autofarmWalkspeed)
+	shared.path = 'Starlight/bss'
+	local savemanager = require(components.linoria.save_manager)
+	local thememanager = require(components.linoria.theme_manager)
+	local uiSettings = Window:AddTab('UI Settings')
+	
+	thememanager:SetLibrary(library)
+	savemanager:SetLibrary(library)
+	
+	thememanager:SetFolder('Starlight')
+	savemanager:SetFolder('Starlight/bss')
+	
+	savemanager:BuildConfigSection(uiSettings)
+	
+	-- Builds our theme menu (with plenty of built in themes) on the left side
+	-- NOTE: you can also call ThemeManager:ApplyToGroupbox to add it to a specific groupbox
+	thememanager:ApplyToTab(uiSettings)
+	savemanager:Load()
 end)
