@@ -7611,6 +7611,10 @@ modules[tbl.planters] = function()
 		planterConfig.enabled = value
 		if value then
 			planterTask:addToQueue()
+		else
+			if planterTask.running then
+				planterTask:stop(true,true)
+			end
 		end
 	end
 	
