@@ -4640,17 +4640,26 @@ end
 modules[tbl.getTokens] = function()
 	local script = tbl.getTokens
 
+	local autofarmHelpers = require(script.Parent.Parent.Features.autofarm.helpers)
+	local playermovement = require(script.Parent.Parent.components.playerMovement)
 	return function(pos, Maxdistance)
 		if not pos then
 			return {}
 		end
+		local tokens = autofarmHelpers.getTokens()
 		local tokenTable={}
 	
-		for index, token in (workspace.Collectibles:GetChildren()) do
-			local distance = (pos-token.Position).Magnitude
+		for index, token in tokens do
+			local p = token.position
+			local distance = (pos-p).Magnitude
+			
+			if workspace.ServerTick.Value - token.spawnTime >= token.duration then
+				continue
+			end
 	
 			if distance <= Maxdistance then
-				table.insert(tokenTable, token)
+				playermovement.newDestination(token.position)
+				playermovement.movementFinished:wait()
 			end
 		end
 		return tokenTable
@@ -5170,6 +5179,11 @@ modules[tbl.autofarmTab] = function()
 			Text = 'Smart Blue Autofarm',
 			Callback = Autofarm.toggleBlueAutofarm
 		})
+		
+		settingsBox:AddToggle('blueAutofarm', {
+			Text = 'Hide Tokens',
+			Callback = Autofarm.hideTokens
+		})
 	
 		settingsBox:AddSlider('walkspeedSlider', {
 			Text = "Autofarm Speed",
@@ -5246,6 +5260,8 @@ modules[tbl.autofarm] = function()
 	local dupedTokens = workspace:WaitForChild("Camera"):WaitForChild("DupedTokens")
 	local PlayerActiveEvent = replicatedStorage:WaitForChild("Events"):WaitForChild("PlayerActivesCommand")
 	
+	local serverTick = workspace.ServerTick
+	
 	local player : Player = shared.localPlayer
 	
 	local CoreStats = player:WaitForChild("CoreStats")
@@ -5260,7 +5276,10 @@ modules[tbl.autofarm] = function()
 	local lastPreciseTarget
 	
 	local targetToken 
-	local tokens = autofarmHelpers.getCollectibles()
+	
+	local collectibles = autofarmHelpers.getCollectibles()
+	local tokens = autofarmHelpers.getTokens()
+	
 	local autodigThread
 	
 	local DEFAULT_TOKEN_DISTANCE = 75	
@@ -5312,7 +5331,23 @@ modules[tbl.autofarm] = function()
 		return false
 	end
 	
+	local function hasPrecision()
+		local precionCount = buffComponents.getBuffStack("Precision")
+		local precisionTime = buffComponents.getBuffTime("Precision")
+	
+		if precionCount < 10 then
+			return false
+		end
+		if precisionTime < 25 then
+			return false
+		end
+		return true
+	end
+	
 	local function moveToBestMarks()
+		if not hasPrecision() then
+			return
+		end
 		local mark = autofarmHelpers.getMarksWithFlames()
 		if mark then
 			playerMovement.newDestination(mark.Position)
@@ -5324,10 +5359,7 @@ modules[tbl.autofarm] = function()
 		local precionCount = buffComponents.getBuffStack("Precision")
 		local precisionTime = buffComponents.getBuffTime("Precision")
 			
-		if precionCount < 10 then
-			return false
-		end
-		if precisionTime < 25 then
+		if not hasPrecision() then
 			return false
 		end
 		if buffComponents.getBuffStack("Red Boost") < 10 or buffComponents.getBuffTime("Red Boost") <= 6 then
@@ -5505,20 +5537,27 @@ modules[tbl.autofarm] = function()
 		if autofarmSettings.farmDupedTokens then
 			farmDupedTokens()
 		end
-		if #tokens == 0 then
+		if #collectibles == 0 then
 			return autofarmHelpers.moveToRandomPos(autofarmSettings.field)
 		end
 		
-		local target = tokens[1]
+		local target = collectibles[1]
+		local isToken = type(target) == 'number'
+		local tokenData = tokens[target]
 		
-		table.remove(tokens, 1)
+		
+		table.remove(collectibles, 1)
+		if isToken and not tokenData or isToken and serverTick.Value - tokenData.spawnTime >= tokenData.duration then
+			return nextToken(task.wait())
+		end
+		local position = if isToken then tokenData.position else target.Position
 	
-		if not autofarmHelpers.canGetItem(target, autofarmSettings.field, autofarmSettings.tokenDistance, autofarmSettings.puffs) then
-			return nextToken(task.wait()) -- this causes the freeze sometimes
+		if not autofarmHelpers.canGetItem(position, autofarmSettings.field, autofarmSettings.tokenDistance, autofarmSettings.puffs) then
+			return nextToken(task.wait()) 
 		end
 		targetToken = target
 		
-		playerMovement.newDestination(targetToken.Position)
+		playerMovement.newDestination(position)
 	end
 	
 	local function endAutofarm()
@@ -5625,18 +5664,38 @@ modules[tbl.autofarm] = function()
 		autofarmSettings.farmDupedTokens = value
 	end
 	
+	function autofarm.hideTokens(value)
+		autofarmHelpers.setExtraEnabled('hideTokens', value)
+	end
+	
 	local function startLoop(callback)
 		targetToken = nil
 	
 		while true do
+			task.wait()
+	
 			local playerPos = shared.character.PrimaryPart.Position
 	
-			local distance = targetToken and (Vector3.new(targetToken.Position.X, playerPos.Y, targetToken.Position.Z) - playerPos).Magnitude or 0
+			local distance = nil
 			local humanoid = shared.character.Humanoid.WalkSpeed
-			if not targetToken or not targetToken.Parent or targetToken.Transparency == 1 or distance and distance < math.max(humanoid/12, 3.25) then
+			local minDistance = math.max(humanoid/12, 3.25)
+	
+			if type(targetToken) == 'number' then
+				local tokendata =  tokens[targetToken]
+				distance = tokendata and (Vector3.new(tokendata.position.X, playerPos.Y, tokendata.position.Z) - playerPos).Magnitude or 0
+	
+				
+				if not tokendata or serverTick.Value - tokendata.spawnTime >= tokendata.duration or distance < minDistance then
+					if callback() == false then return end
+				end
+				continue
+			end
+			distance = targetToken and (Vector3.new(targetToken.Position.X, playerPos.Y, targetToken.Position.Z) - playerPos).Magnitude or 0
+	
+			
+			if not targetToken or not targetToken.Parent or targetToken.Transparency == 1 or distance < minDistance then
 				if callback() == false then return end
 			end
-			task.wait()
 		end
 	end
 	
@@ -5721,7 +5780,8 @@ modules[tbl.helpers] = function()
 	rayParams.FilterType = Enum.RaycastFilterType.Include
 	rayParams.FilterDescendantsInstances = workspace.FlowerZones:GetChildren()
 	
-	local tokens = workspace.Collectibles:GetChildren()
+	local collectibles = {}
+	local tokens = {}
 	
 	local particles = workspace:WaitForChild("Particles")
 	local flamesFolder = workspace:WaitForChild("PlayerFlames")
@@ -5729,6 +5789,7 @@ modules[tbl.helpers] = function()
 	local stationManager = require(game.ReplicatedStorage.ClientScripts.Listeners.StationsListener)
 	local scorchingStarManager = require(game.ReplicatedStorage.LocalFX.ScorchingStar)
 	local localFlames = require(game.ReplicatedStorage.LocalFX.LocalFlames)
+	local collectiblesAnimator = require(game.ReplicatedStorage.CollectiblesAnimator)
 	
 	local playerMovement = require(script.Parent.Parent.Parent.components.playerMovement)
 	
@@ -5739,6 +5800,7 @@ modules[tbl.helpers] = function()
 	local extras = {
 		bubbles = false,
 		marks = false,
+		hideTokens = false
 	}
 	
 	local function markCheck(token)
@@ -5802,10 +5864,13 @@ modules[tbl.helpers] = function()
 	end
 	
 	function module.canGetItem(item, field, maxDistance, puffs)
-		if not item.Parent then
+		local isInstance = typeof(item) == 'Instance'
+		local position = isInstance and item.Position or item
+		
+		if isInstance and not item.Parent then
 			return false
 		end
-		local distance = shared.localPlayer:DistanceFromCharacter(item.Position)
+		local distance = shared.localPlayer:DistanceFromCharacter(position)
 		if distance > maxDistance then
 			return false
 		end
@@ -5817,7 +5882,7 @@ modules[tbl.helpers] = function()
 			end
 		end
 		
-		local ray = module.posToField(item.Position)
+		local ray = module.posToField(position)
 		
 		if not puffs and extras.marks and markCount >= 3 and not markCheck(item) then
 			return false
@@ -5827,7 +5892,7 @@ modules[tbl.helpers] = function()
 	end
 	
 	function module.getCollectibles()
-		return tokens
+		return collectibles
 	end
 	
 	function module.setExtraEnabled(key, value)
@@ -5854,22 +5919,9 @@ modules[tbl.helpers] = function()
 		return activestars[shared.character] ~= nil
 	end
 	
-	local function tokenAdded(t)
-		table.insert(tokens, t)
-		table.sort(tokens, function(a, b)
-			local ref = shared.character.PrimaryPart.Position
-			return (a.Position - ref).Magnitude < (b.Position - ref).Magnitude
-		end)
-	end
-	
-	local function tokensRemoved(t)
-		local exist = table.find(tokens,t)
-		if exist then table.remove(tokens,exist) end
-	end
-	
 	local function particleAdded(particle)
 		if particle.Name == "Bubble" and extras.bubbles then
-			table.insert(tokens, particle)
+			table.insert(collectibles, particle)
 		end
 	end
 	
@@ -5980,11 +6032,41 @@ modules[tbl.helpers] = function()
 		end
 	end
 	
+	function module.getTokens()
+		return tokens
+	end
+	
+	local function onCollectibleEvent(spawnType, params)
+		if not params.ID then
+			return
+		end
+		if spawnType == 'Spawn' then
+			 tokens[params.ID] = {
+				position = params.Pos,
+				duration = params.Dur or 0,
+				spawnTime = params.SpawnTime,
+			}
+			table.insert(collectibles, params.ID)
+		else
+			local exist = table.find(collectibles, params.ID)
+			if exist then
+				table.remove(collectibles, exist)
+			end
+			tokens[params.ID] = nil
+		end
+	end
+	
 	function module.init()
-		workspace.Collectibles.ChildAdded:Connect(tokenAdded)
-		workspace.Collectibles.ChildRemoved:Connect(tokensRemoved)
+		game.ReplicatedStorage.Events.CollectibleEvent.OnClientEvent:Connect(onCollectibleEvent)
 		
 		particles.ChildAdded:Connect(particleAdded)
+		
+		local oldTokenSpawn = nil; oldTokenSpawn = hookfunction(collectiblesAnimator.Spawn, function(...)
+			if extras.hideTokens then
+				return coroutine.yield()
+			end
+			return oldTokenSpawn(...)
+		end)
 		
 		local oldSpawn = nil; oldSpawn = hookfunction(stationManager.Actions.Spawn, function(...)
 			markCount += 1
@@ -6791,7 +6873,7 @@ modules[tbl.mobs] = function()
 	local taskSystem = require(components.taskSystem)
 	local keyPress = require(components.keyPress)
 	local mobData = require(components.monsterData).Spawners
-	local tokens = require(components.getTokens)
+	local lootTokens = require(components.getTokens)
 	local playerMovement = require(components.playerMovement)
 	
 	local mobTools = require(replicatedStorage.ClientMonsterTools)
@@ -6829,13 +6911,7 @@ modules[tbl.mobs] = function()
 		
 		task.wait(1)
 		local pos = shared.character and shared.character.PrimaryPart
-		local tokens = tokens(pos.Position, 45)
-		
-		for _, token in tokens do
-			if not token.Parent then continue end
-			playerMovement.newDestination(token.Position)
-			playerMovement.movementFinished:wait() 
-		end
+		lootTokens(pos.Position, 45)
 	end
 	
 	local function startGettingMobs()
@@ -7453,15 +7529,8 @@ modules[tbl.planters] = function()
 	
 	local function lootPlanter()
 		local character = shared.character
-		local tokens = require(components.getTokens)(character.PrimaryPart.Position, 35)
-		local playerMovement = require(components.playerMovement)
-		
-		for _, token in tokens do
-			if token.Parent then
-				playerMovement.newDestination(token.Position)
-				playerMovement.movementFinished:wait()
-			end
-		end
+		local lootFunc = require(components.getTokens)
+		lootFunc(character.PrimaryPart.Position, 35)
 	end
 	
 	local function harvestAll()
@@ -7474,7 +7543,7 @@ modules[tbl.planters] = function()
 				local CFrame = CFrame.new(Position)
 				local planter_string = tostring(v.PotModel)
 	
-				local field = autofarmHelpers.posToField(Position) 
+				local field = autofarmHelpers.posToField(Position+Vector3.new(0,3,0))
 				if field and not degradingFields[field.Instance.Name] then
 					degradingFields[field.Instance.Name] = 1
 				end
